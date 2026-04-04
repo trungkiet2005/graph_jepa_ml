@@ -298,7 +298,7 @@ def train(train_loader, model, optimizer, evaluator, device,
           momentum_weight, sharp=None, criterion_type=0):
     criterion = torch.nn.SmoothL1Loss(beta=0.5)
     step_losses, num_targets = [], []
-    scaler = torch.cuda.amp.GradScaler(enabled=USE_AMP)
+    scaler = torch.amp.GradScaler('cuda', enabled=USE_AMP)
 
     for data in train_loader:
         if model.use_lap:
@@ -310,7 +310,7 @@ def train(train_loader, model, optimizer, evaluator, device,
         data = data.to(device)
         optimizer.zero_grad()
 
-        with torch.cuda.amp.autocast(enabled=USE_AMP, dtype=AMP_DTYPE):
+        with torch.amp.autocast('cuda', enabled=USE_AMP, dtype=AMP_DTYPE):
             loss, num_t = _compute_loss(model, data, criterion, criterion_type)
 
         scaler.scale(loss).backward()
@@ -332,7 +332,7 @@ def test(loader, model, evaluator, device, criterion_type=0):
     step_losses, num_targets = [], []
     for data in loader:
         data = data.to(device)
-        with torch.cuda.amp.autocast(enabled=USE_AMP, dtype=AMP_DTYPE):
+        with torch.amp.autocast('cuda', enabled=USE_AMP, dtype=AMP_DTYPE):
             loss, num_t = _compute_loss(model, data, criterion, criterion_type)
         step_losses.append(loss.item())
         num_targets.append(num_t)
