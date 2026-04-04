@@ -61,7 +61,7 @@ def run(cfg, create_dataset, create_model, train, test, evaluator=None):
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min',
                                                                factor=cfg.train.lr_decay,
                                                                patience=cfg.train.lr_patience,
-                                                               verbose=True)
+                                                               )
 
         start_outer = time.time()
         per_epoch_time = []
@@ -228,7 +228,7 @@ def run_k_fold(cfg, create_dataset, create_model, train, test, evaluator=None, k
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min',
                                                                    factor=cfg.train.lr_decay,
                                                                    patience=cfg.train.lr_patience,
-                                                                   verbose=True)
+                                                                   )
 
             start_outer = time.time()
             per_epoch_time = []
