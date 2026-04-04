@@ -5,7 +5,7 @@ from core.config import cfg, update_cfg
 
 from torch_geometric.datasets import ZINC, TUDataset
 from core.data_utils.exp import PlanarSATPairsDataset
-from core.transform import PositionalEncodingTransform, GraphJEPAPartitionTransform
+from core.transform import PositionalEncodingTransform, GraphJEPAPartitionTransform, GraphHMSJEPAPartitionTransform
 
 
 def calculate_stats(dataset):
@@ -23,29 +23,36 @@ def create_dataset(cfg):
     transform_train = transform_eval = None
 
     if cfg.metis.n_patches > 0:
-        _transform_train = GraphJEPAPartitionTransform(n_patches=cfg.metis.n_patches,
-                                                metis=cfg.metis.enable,
-                                                drop_rate=cfg.metis.drop_rate,
-                                                num_hops=cfg.metis.num_hops,
-                                                is_directed=cfg.dataset == 'TreeDataset',
-                                                patch_rw_dim=cfg.pos_enc.patch_rw_dim,
-                                                patch_num_diff=cfg.pos_enc.patch_num_diff,
-                                                num_context=cfg.jepa.num_context, 
-                                                num_targets=cfg.jepa.num_targets
-                                            )
+        use_hms = getattr(cfg.jepa, 'num_scales', 1) > 1
+        _TransformCls = GraphHMSJEPAPartitionTransform if use_hms else GraphJEPAPartitionTransform
 
-        _transform_eval = GraphJEPAPartitionTransform(n_patches=cfg.metis.n_patches,
-                                            metis=cfg.metis.enable,
-                                            drop_rate=0.0,
-                                            num_hops=cfg.metis.num_hops,
-                                            is_directed=cfg.dataset == 'TreeDataset',
-                                            patch_rw_dim=cfg.pos_enc.patch_rw_dim,
-                                            patch_num_diff=cfg.pos_enc.patch_num_diff,
-                                            num_context=cfg.jepa.num_context, 
-                                            num_targets=cfg.jepa.num_targets
-                                        )
-        transform_train = _transform_train
-        transform_eval = _transform_eval
+        common_kwargs = dict(
+            n_patches=cfg.metis.n_patches,
+            patch_rw_dim=cfg.pos_enc.patch_rw_dim,
+            patch_num_diff=cfg.pos_enc.patch_num_diff,
+            num_context=cfg.jepa.num_context,
+            num_targets=cfg.jepa.num_targets,
+        )
+        if use_hms:
+            common_kwargs.update(dict(
+                metis_enable=cfg.metis.enable,
+                scale_factor=cfg.jepa.scale_factor,
+                num_hops=cfg.metis.num_hops,
+                is_directed=cfg.dataset == 'TreeDataset',
+                num_targets_L1=cfg.jepa.num_targets_L1,
+                num_targets_L2=cfg.jepa.num_targets_L2,
+            ))
+        else:
+            common_kwargs.update(dict(
+                metis=cfg.metis.enable,
+                num_hops=cfg.metis.num_hops,
+                is_directed=cfg.dataset == 'TreeDataset',
+            ))
+
+        _transform_train = _TransformCls(drop_rate=cfg.metis.drop_rate, **common_kwargs)
+        _transform_eval  = _TransformCls(drop_rate=0.0, **common_kwargs)
+        transform_train  = _transform_train
+        transform_eval   = _transform_eval
     else:
         print('Not supported...')
         exit() 

@@ -1,4 +1,4 @@
-from core.model import GraphJepa
+from core.model import GraphJepa, GraphHMSJepa
 import sys
 
 def create_model(cfg):
@@ -67,7 +67,7 @@ def create_model(cfg):
 
     if cfg.metis.n_patches > 0:
         if cfg.jepa.enable:
-            return GraphJepa(
+            common_kwargs = dict(
                 nfeat_node=nfeat_node,
                 nfeat_edge=nfeat_edge,
                 nhid=cfg.model.hidden_size,
@@ -86,8 +86,19 @@ def create_model(cfg):
                 n_patches=cfg.metis.n_patches,
                 patch_rw_dim=cfg.pos_enc.patch_rw_dim,
                 num_context_patches=cfg.jepa.num_context,
-                num_target_patches=cfg.jepa.num_targets
-            ) 
+                num_target_patches=cfg.jepa.num_targets,
+            )
+            use_hms = getattr(cfg.jepa, 'num_scales', 1) > 1
+            if use_hms:
+                return GraphHMSJepa(
+                    **common_kwargs,
+                    num_target_patches_L1=cfg.jepa.num_targets_L1,
+                    num_target_patches_L2=cfg.jepa.num_targets_L2,
+                    loss_weights=cfg.jepa.loss_weights,
+                    var_weight=cfg.jepa.var_weight,
+                )
+            else:
+                return GraphJepa(**common_kwargs)
         else:
             print('Not supported...')
             sys.exit() 

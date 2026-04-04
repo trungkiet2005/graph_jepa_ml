@@ -105,10 +105,23 @@ def set_cfg(cfg):
     cfg.jepa.enable = True
     # Number of patches to use as context
     cfg.jepa.num_context = 1
-    # Number of patches to use as targets
+    # Number of patches to use as targets (L0 same-scale)
     cfg.jepa.num_targets = 4
     # Distance function: 0 = 2d Hyper (Ours), 1 = Euclidean, 2 = Hyperbolic (Poincaré)
     cfg.jepa.dist = 0
+
+    # ---- HMS-JEPA options (num_scales > 1 activates hierarchical mode) ----
+    # Number of hierarchy levels: 1 = original Graph-JEPA, 3 = HMS-JEPA
+    cfg.jepa.num_scales = 1
+    # Each level coarsens by this factor (L1 = n_patches // scale_factor, etc.)
+    cfg.jepa.scale_factor = 4
+    # Loss weights for [L0 same-scale, L0->L1 cross-scale, L1->L2 cross-scale]
+    cfg.jepa.loss_weights = [1.0, 0.5, 0.25]
+    # Number of target patches at L1 and L2
+    cfg.jepa.num_targets_L1 = 4
+    cfg.jepa.num_targets_L2 = 1
+    # Weight for VICReg-style variance regularisation (collapse prevention)
+    cfg.jepa.var_weight = 0.01
 
     return cfg
 
