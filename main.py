@@ -1,18 +1,29 @@
 # ── SECTION 0: Auto-install dependencies ────────────────────────
-import subprocess, sys
+import subprocess, sys, shutil, os
 
-def _pip_install(*packages):
-    for pkg in packages:
-        try:
-            __import__(pkg.split('==')[0].replace('-', '_'))
-        except ImportError:
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', pkg])
+# Install native METIS library
+if shutil.which('apt-get') and not shutil.which('gpmetis'):
+    subprocess.check_call(['sudo', 'apt-get', 'install', '-y', '-qq', 'libmetis-dev'])
+os.environ.setdefault('METIS_DLL', '/usr/lib/x86_64-linux-gnu/libmetis.so')
 
-_pip_install(
-    'torch', 'numpy', 'scipy', 'scikit-learn', 'networkx',
-    'einops', 'ogb', 'yacs', 'metis',
-    'torch-geometric', 'torch-scatter', 'torch-sparse',
-)
+# Detect torch version for PyG wheel URL
+import torch as _torch
+_pyg_whl_url = f'https://data.pyg.org/whl/torch-{_torch.__version__}.html'
+
+def _pip_install(*packages, find_links=None):
+    cmd = [sys.executable, '-m', 'pip', 'install', '-q']
+    if find_links:
+        cmd += ['-f', find_links]
+    cmd += list(packages)
+    subprocess.check_call(cmd)
+
+# PyG ecosystem (needs matching torch/CUDA wheels)
+_pip_install('torch-scatter', 'torch-sparse', 'torch-cluster', 'torch-geometric',
+             find_links=_pyg_whl_url)
+
+# Other dependencies
+_pip_install('numpy', 'scipy', 'scikit-learn', 'networkx',
+             'einops', 'ogb', 'yacs', 'metis', 'tensorboard')
 
 # ── SECTION 1: Third-party imports ──────────────────────────────
 import os
@@ -48,7 +59,7 @@ import networkx as nx
 try:
     import metis as metis_lib
     _METIS_AVAILABLE = True
-except ImportError:
+except (ImportError, RuntimeError):
     _METIS_AVAILABLE = False
 
 from sklearn.model_selection import StratifiedKFold
@@ -2862,7 +2873,12 @@ def run_k_fold(cfg, create_dataset_fn, create_model_fn, train_fn, test_fn, evalu
 
             print("Data shapes:", X_train.shape, y_train.shape, X_test.shape, y_test.shape)
 
-            lin_model = LogisticRegression(max_iter=10000)
+            from sklearn.preprocessing import StandardScaler
+            scaler = StandardScaler()
+            X_train = scaler.fit_transform(X_train)
+            X_test = scaler.transform(X_test)
+
+            lin_model = LogisticRegression(max_iter=50000)
             lin_model.fit(X_train, y_train)
             lin_predictions = lin_model.predict(X_test)
             lin_accuracy = accuracy_score(y_test, lin_predictions)
