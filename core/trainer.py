@@ -32,12 +32,16 @@ def run(cfg, create_dataset, create_model, train, test, evaluator=None):
 
     train_dataset, val_dataset, test_dataset = create_dataset(cfg)
 
+    _pw = cfg.num_workers > 0
     train_loader = DataLoader(
-        train_dataset, cfg.train.batch_size, shuffle=True, num_workers=cfg.num_workers)
+        train_dataset, cfg.train.batch_size, shuffle=True,
+        num_workers=cfg.num_workers, pin_memory=True, persistent_workers=_pw)
     val_loader = DataLoader(
-        val_dataset,  cfg.train.batch_size, shuffle=False, num_workers=cfg.num_workers)
+        val_dataset,  cfg.train.batch_size, shuffle=False,
+        num_workers=cfg.num_workers, pin_memory=True, persistent_workers=_pw)
     test_loader = DataLoader(
-        test_dataset, cfg.train.batch_size, shuffle=False, num_workers=cfg.num_workers)
+        test_dataset, cfg.train.batch_size, shuffle=False,
+        num_workers=cfg.num_workers, pin_memory=True, persistent_workers=_pw)
 
     hms_tag = "HMS-JEPA" if getattr(cfg.jepa, 'num_scales', 1) > 1 else "Graph-JEPA"
     print(f"\n{'='*70}")
@@ -253,10 +257,13 @@ def run_k_fold(cfg, create_dataset, create_model, train, test, evaluator=None, k
             if not cfg.metis.online:
                 train_dataset = [x for x in train_dataset]
 
+            _pw = cfg.num_workers > 0
             train_loader = DataLoader(
-                train_dataset, cfg.train.batch_size, shuffle=True, num_workers=cfg.num_workers)
+                train_dataset, cfg.train.batch_size, shuffle=True,
+                num_workers=cfg.num_workers, pin_memory=True, persistent_workers=_pw)
             test_loader = DataLoader(
-                test_dataset,  cfg.train.batch_size, shuffle=False, num_workers=cfg.num_workers)
+                test_dataset,  cfg.train.batch_size, shuffle=False,
+                num_workers=cfg.num_workers, pin_memory=True, persistent_workers=_pw)
 
             model = create_model(cfg).to(cfg.device)
             if n_params is None:
