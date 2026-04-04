@@ -1,0 +1,31 @@
+dataset: IMDB-MULTI
+num_workers: 8
+model:
+  gMHA_type: Hadamard
+  gnn_type: GINEConv
+  nlayer_gnn: 2
+  nlayer_mlpmixer: 2
+  hidden_size: 512
+train:
+  lr_patience: 20
+  epochs: 5
+  batch_size: 32
+  lr: 0.0005
+  runs: 5
+metis:
+  n_patches: 32
+pos_enc:
+  rw_dim: 15
+  patch_rw_dim: 15
+  lap_dim: 0
+  patch_num_diff: 0
+jepa:
+  num_context: 1
+  num_targets: 4
+  num_scales: 3
+  scale_factor: 4
+  loss_weights: [1.0, 0.5, 0.25]
+  num_targets_L1: 4
+  num_targets_L2: 1
+  var_weight: 0.01
+device: 1
