@@ -46,7 +46,14 @@ def config_logger(cfg, OUT_PATH="results/", time=True):
 
     # redirect stdout print, better for large scale experiments
     os.makedirs(os.path.join('logs', data_name), exist_ok=True)
-    sys.stdout = open(f'logs/{data_name}/{config_string}.txt', 'w')
+    log_file = open(f'logs/{data_name}/{config_string}.txt', 'w')
+    class Tee:
+        def __init__(self, *files): self.files = files
+        def write(self, s):
+            for f in self.files: f.write(s)
+        def flush(self):
+            for f in self.files: f.flush()
+    sys.stdout = Tee(sys.__stdout__, log_file)
 
     # log configuration
     print("-"*50)
