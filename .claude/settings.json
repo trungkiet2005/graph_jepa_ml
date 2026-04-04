@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/huynh/**)",
+      "Bash(pip install:*)",
+      "Bash(/c/Users/huynh/anaconda3/python -c \"import torch_geometric; print\\('pyg ok'\\)\")",
+      "Bash(C:/Users/huynh/anaconda3/envs/machine-learning/python -c \"import torch_geometric; print\\('pyg ok'\\)\")",
+      "Bash(py -0)",
+      "Bash(py -3 -c \"import torch_geometric; print\\('ok'\\)\")",
+      "Read(//d//**)"
+    ]
+  }
+}

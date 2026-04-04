@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(conda run:*)",
+      "Bash(pip show:*)",
+      "Bash(ls \"D:/AI_RESEARCH/machine_learning_hcmus/graph-jepa/\"*.txt \"D:/AI_RESEARCH/machine_learning_hcmus/graph-jepa/\"*.toml \"D:/AI_RESEARCH/machine_learning_hcmus/graph-jepa/\"*.yml)",
+      "Bash(where python:*)"
+    ]
+  }
+}
