@@ -36,6 +36,13 @@ Paper gốc (Table 1, Graph-JEPA, Skenderi et al.):
 | 05   | Adaptive Loss Weights (Kendall)   | 86.67±1.33*      | 4/5 runs  | −4.58pp     | Kaggle 2026-04-04; `GraphHMSJepaAdaptive`, Kendall uncertainty; `metis.online: True`; run 4 chưa có `Acc mean` |
 | 06   | Combined (VICReg+LayerAttn+Adapt) | 84.55±1.69*      | 4/5 runs  | −6.70pp     | Kaggle 2026-04-04; `GraphHMSJepaCombined`, VICReg trên pred + Kendall + layer-attn; `metis.online: True`; run 4 chưa có `Acc mean` |
 | 07   | H100 All-datasets baseline         | 85.68±1.50       | PARTIAL   | −5.57pp     | Kaggle H100; MUTAG hoàn tất, job dừng ở PROTEINS do `NameError: exit` |
+| 08   | ASAM/SAM Optimizer                 | —                | TO RUN    | —           | seeks flat minima for better generalization |
+| 09   | Cosine Loss + Anneal VICReg + EMA  | —                | TO RUN    | —           | scale-invariant loss + stabilization |
+| 10   | Stochastic Depth (DropPath)        | —                | TO RUN    | —           | implicit ensemble/regularization for small folds |
+| 11   | Full-dim Poincaré Ball JEPA        | —                | TO RUN    | —           | 512D hyperbolic space with learnable curvature |
+| 12   | Mamba-SSM Patch Encoder            | —                | TO RUN    | —           | Selective State Space for long-range structure |
+| 13   | Multi-Context JEPA + NT-Xent       | —                | TO RUN    | —           | 2 contexts + auxiliary contrastive loss |
+| 14   | Hybrid JEPA + MAE Dual Objective   | —                | TO RUN    | —           | Representation (JEPA) + Feature (MAE) reconstruction |
 
 *exp02: only 4/5 runs completed. Run 4 chưa xong. Avg of runs 0-3: (88.27+86.67+85.15+88.25)/4 = 87.09%
 
@@ -62,6 +69,13 @@ Paper gốc (Table 1, Graph-JEPA, Skenderi et al.):
 | 05   | —        | 86.67±1.33* | —        | —        | —         | —        | —        | —        |
 | 06   | —        | 84.55±1.69* | —        | —        | —         | —        | —        | —        |
 | 07   | CRASH (`NameError: exit`) | 85.68±1.50 | —        | —        | —         | —        | —        | —        |
+| 08   | —        | —        | —        | —        | —         | —        | —        | —        |
+| 09   | —        | —        | —        | —        | —         | —        | —        | —        |
+| 10   | —        | —        | —        | —        | —         | —        | —        | —        |
+| 11   | —        | —        | —        | —        | —         | —        | —        | —        |
+| 12   | —        | —        | —        | —        | —         | —        | —        | —        |
+| 13   | —        | —        | —        | —        | —         | —        | —        | —        |
+| 14   | —        | —        | —        | —        | —         | —        | —        | —        |
 
 ---
 
@@ -253,6 +267,41 @@ Paper gốc (Table 1, Graph-JEPA, Skenderi et al.):
 **Notes nhanh để resume:**
 - Kiểm tra chuỗi tên dataset trong config (`PROTEINS` vs key mà `create_dataset()` hỗ trợ).
 - Sửa `exit(1)` trong `core/get_data.py` thành `sys.exit(1)` hoặc `raise ValueError(...)` để tránh lỗi NameError và có thông báo rõ ràng hơn.
+
+---
+
+### EXP 08 — ASAM/SAM Optimizer
+**Setup:** `exp_08_h100_sam_optimizer.py`. Sử dụng `ASAM` (Adaptive Sharpness-Aware Minimization) thay cho Adam để tìm flat minima.
+
+---
+
+### EXP 09 — Cosine Loss + Annealed VICReg + Cosine EMA Schedule
+**Setup:** `exp_09_h100_cosine_loss.py`. Thay `SmoothL1` bằng **Cosine Similarity**. Anneal `vic_weight` từ 0.05 về 0. EMA momentum schedule 0.996 → 1.0.
+
+---
+
+### EXP 10 — Stochastic Depth (DropPath)
+**Setup:** `exp_10_h100_stochastic_depth.py`. Thêm `DropPath` vào các lớp GNN residual and Mixer blocks.
+
+---
+
+### EXP 11 — Full-dimensional Poincaré Ball JEPA
+**Setup:** `exp_11_h100_poincare_ball.py`. Chuyển từ 2D Lorentzian hyperbola sang **512D Poincaré ball** với learnable curvature `c`.
+
+---
+
+### EXP 12 — Mamba-SSM Patch Encoder
+**Setup:** `exp_12_h100_mamba_ssm.py`. Thay thế Transformer Attention bằng **Selective State Space (S6/Mamba)** blocks.
+
+---
+
+### EXP 13 — Multi-Context Multi-Target (MCMT) JEPA + NT-Xent
+**Setup:** `exp_13_h100_mcmt_jepa.py`. Sử dụng **2 context patches** predict targets + NT-Xent auxiliary contrastive loss.
+
+---
+
+### EXP 14 — Hybrid JEPA + MAE Dual Objective
+**Setup:** `exp_14_h100_mae_jepa.py`. Kết hợp **Predictive (JEPA)** và **Generative (MAE)** reconstruction targets.
 
 ---
 
