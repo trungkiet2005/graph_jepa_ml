@@ -336,8 +336,10 @@ def preflight_one_dataset(dataset_name):
     scaler.scale(loss).backward()
     scaler.unscale_(base_opt)
     minimizer.ascent_step()
+    scaler.update()            # must call update() before next unscale_()
 
     # SAM descent (second forward-backward)
+    base_opt.zero_grad()
     with torch.amp.autocast("cuda", enabled=USE_AMP, dtype=AMP_DTYPE):
         loss2, _ = _compute_loss(model, data, criterion, cfg.jepa.dist)
     scaler.scale(loss2).backward()

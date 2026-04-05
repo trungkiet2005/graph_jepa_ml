@@ -322,19 +322,34 @@ def _mcmt_loss(model, data):
 # ─────────────────────────────────────────────────────────────
 # MODEL FACTORY
 # ─────────────────────────────────────────────────────────────
+
+def _resolve_dataset_types(dataset_name):
+    """Return (node_type, edge_type, nfeat_node, nfeat_edge) for a dataset."""
+    mapping = {
+        'MUTAG':        ('Linear',   'Linear',   7,  4),
+        'PROTEINS':     ('Linear',   'Linear',   3,  1),
+        'DD':           ('Linear',   'Linear',   89, 1),
+        'IMDB-BINARY':  ('Linear',   'Linear',   1,  1),
+        'IMDB-MULTI':   ('Linear',   'Linear',   1,  1),
+        'REDDIT-BINARY':('Linear',   'Linear',   1,  1),
+        'ZINC':         ('Discrete', 'Discrete', 28, 4),
+    }
+    return mapping.get(dataset_name, ('Linear', 'Linear', 1, 1))
+
+
 def create_model_mcmt(cfg):
     base = create_model(cfg)
     if not isinstance(base, GraphHMSJepa):
         return base
+    node_type, edge_type, nfeat_node, nfeat_edge = _resolve_dataset_types(cfg.dataset)
     model = GraphHMSJepaMCMT(
-        nfeat_node=base.input_encoder.encoder.weight.shape[1]
-            if hasattr(base.input_encoder, 'encoder') else 1,
-        nfeat_edge=base.nfeat_edge, nhid=base.nhid, nout=1,
+        nfeat_node=nfeat_node, nfeat_edge=nfeat_edge,
+        nhid=base.nhid, nout=1,
         nlayer_gnn=len(base.gnns), nlayer_mlpmixer=cfg.model.nlayer_mlpmixer,
-        node_type=getattr(cfg.model,'node_type',0), edge_type=getattr(cfg.model,'edge_type',0),
+        node_type=node_type, edge_type=edge_type,
         gnn_type=cfg.model.gnn_type, gMHA_type=cfg.model.gMHA_type,
         rw_dim=cfg.pos_enc.rw_dim, lap_dim=cfg.pos_enc.lap_dim,
-        dropout=getattr(cfg.model,'dropout',0), mlpmixer_dropout=getattr(cfg.model,'mlpmixer_dropout',0),
+        dropout=getattr(cfg.train,'dropout',0), mlpmixer_dropout=getattr(cfg.train,'mlpmixer_dropout',0),
         n_patches=cfg.metis.n_patches, patch_rw_dim=cfg.pos_enc.patch_rw_dim,
         num_context_patches=cfg.jepa.num_context, num_target_patches=cfg.jepa.num_targets,
         num_target_patches_L1=cfg.jepa.num_targets_L1, num_target_patches_L2=cfg.jepa.num_targets_L2,

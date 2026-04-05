@@ -218,6 +218,21 @@ class GraphHMSJepaDropPath(GraphHMSJepa):
 # ─────────────────────────────────────────────────────────────
 # 5. CUSTOM MODEL FACTORY
 # ─────────────────────────────────────────────────────────────
+
+def _resolve_dataset_types(dataset_name):
+    """Return (node_type, edge_type, nfeat_node, nfeat_edge) for a dataset."""
+    mapping = {
+        'MUTAG':        ('Linear',   'Linear',   7,  4),
+        'PROTEINS':     ('Linear',   'Linear',   3,  1),
+        'DD':           ('Linear',   'Linear',   89, 1),
+        'IMDB-BINARY':  ('Linear',   'Linear',   1,  1),
+        'IMDB-MULTI':   ('Linear',   'Linear',   1,  1),
+        'REDDIT-BINARY':('Linear',   'Linear',   1,  1),
+        'ZINC':         ('Discrete', 'Discrete', 28, 4),
+    }
+    return mapping.get(dataset_name, ('Linear', 'Linear', 1, 1))
+
+
 # DropPath rates per dataset (tuned for dataset size; larger DP for smaller datasets)
 DATASET_DROP_RATES = {
     "MUTAG":       {"gnn": 0.15, "mixer": 0.10},   # 188 graphs, smallest → highest dropout
@@ -244,26 +259,27 @@ def create_model_droppath(cfg):
     ds_name = _CURRENT_DATASET[0]
     rates   = DATASET_DROP_RATES.get(ds_name, {"gnn": 0.05, "mixer": 0.05})
 
+    # Resolve dataset-specific node/edge types
+    node_type, edge_type, nfeat_node, nfeat_edge = _resolve_dataset_types(ds_name)
+
     # Re-instantiate as GraphHMSJepaDropPath with same cfg
     dp_model = GraphHMSJepaDropPath(
-        nfeat_node           = model.input_encoder.encoder.weight.shape[1]
-                               if hasattr(model.input_encoder, 'encoder')
-                               else cfg.dataset_feat_dim if hasattr(cfg, 'dataset_feat_dim') else 1,
-        nfeat_edge           = model.nfeat_edge,
+        nfeat_node           = nfeat_node,
+        nfeat_edge           = nfeat_edge,
         nhid                 = model.nhid,
         nout                 = 1,
         nlayer_gnn           = len(model.gnns),
         nlayer_mlpmixer      = model.context_encoder_L0.nlayer
                                if hasattr(model.context_encoder_L0, 'nlayer')
                                else cfg.model.nlayer_mlpmixer,
-        node_type            = cfg.model.node_type if hasattr(cfg.model, 'node_type') else 0,
-        edge_type            = cfg.model.edge_type if hasattr(cfg.model, 'edge_type') else 0,
+        node_type            = node_type,
+        edge_type            = edge_type,
         gnn_type             = cfg.model.gnn_type,
         gMHA_type            = cfg.model.gMHA_type,
         rw_dim               = cfg.pos_enc.rw_dim,
         lap_dim              = cfg.pos_enc.lap_dim,
-        dropout              = cfg.model.dropout if hasattr(cfg.model, 'dropout') else 0,
-        mlpmixer_dropout     = cfg.model.mlpmixer_dropout if hasattr(cfg.model, 'mlpmixer_dropout') else 0,
+        dropout              = getattr(cfg.train, 'dropout', 0),
+        mlpmixer_dropout     = getattr(cfg.train, 'mlpmixer_dropout', 0),
         n_patches            = cfg.metis.n_patches,
         patch_rw_dim         = cfg.pos_enc.patch_rw_dim,
         num_context_patches  = cfg.jepa.num_context,
