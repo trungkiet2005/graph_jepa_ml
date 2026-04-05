@@ -64,6 +64,7 @@ from core.get_data import create_dataset
 from core.get_model import create_model
 from torch_geometric.loader import DataLoader
 from core.trainer import run_k_fold, run, k_fold
+from core.tracker_footer import print_exp_tracker_footer
 from core.model import GraphHMSJepa
 from core.model_utils.elements import MLP
 from train.zinc import _ema_update
@@ -667,16 +668,16 @@ if __name__ == "__main__":
         except Exception as e: print(f"\n  PREFLIGHT FAILED: {e!r}"); raise
         if pf_only: sys.exit(0)
 
-    wall_times = {}; total_start = time.time()
+    wall_times = {}; tracker_results = {}; total_start = time.time()
     for dataset_name in DATASETS_TO_RUN:
         ds_start = time.time()
         print(f"\n{'#'*70}\n#  EXP 13 — MCMT — DATASET: {dataset_name}\n{'#'*70}")
         updated_cfg = _merge_cfg_for_dataset(dataset_name)
         is_regression = (dataset_name == "ZINC")
         if is_regression:
-            run(updated_cfg, create_dataset, create_model_mcmt, train, test)
+            tracker_results[dataset_name] = run(updated_cfg, create_dataset, create_model_mcmt, train, test)
         else:
-            run_k_fold(updated_cfg, create_dataset, create_model_mcmt, train, test)
+            tracker_results[dataset_name] = run_k_fold(updated_cfg, create_dataset, create_model_mcmt, train, test)
         ds_elapsed = time.time() - ds_start
         wall_times[dataset_name] = ds_elapsed
         print(f"\n  [{dataset_name}] wall time: {ds_elapsed/60:.1f} min")
@@ -684,4 +685,4 @@ if __name__ == "__main__":
     total_elapsed = time.time() - total_start
     print(f"\n{'='*70}\n  EXP 13 (MCMT-JEPA) COMPLETE | Total: {total_elapsed/60:.1f} min\n{'='*70}")
     for ds, t in wall_times.items(): print(f"  {ds:<12}  {t/60:>9.1f}m")
-    print("  [TRACKER] Copy results above → EXP 13 row in tracker.md")
+    print_exp_tracker_footer(13, "Multi-Context Multi-Target JEPA + NT-Xent", tracker_results)

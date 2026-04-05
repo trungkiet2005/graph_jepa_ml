@@ -35,9 +35,9 @@ Paper gốc (Table 1, Graph-JEPA, Skenderi et al.):
 | 04   | Multi-view Re-masking             | 85.75±0.64*      | 4/5 runs  | −5.50pp     | Kaggle 2026-04-04; `GraphHMSJepaMultiView`, K=4 views, drop 0.15; `metis.online: True`; run 4 chưa có `Acc mean` |
 | 05   | Adaptive Loss Weights (Kendall)   | 86.67±1.33*      | 4/5 runs  | −4.58pp     | Kaggle 2026-04-04; `GraphHMSJepaAdaptive`, Kendall uncertainty; `metis.online: True`; run 4 chưa có `Acc mean` |
 | 06   | Combined (VICReg+LayerAttn+Adapt) | 84.55±1.69*      | 4/5 runs  | −6.70pp     | Kaggle 2026-04-04; `GraphHMSJepaCombined`, VICReg trên pred + Kendall + layer-attn; `metis.online: True`; run 4 chưa có `Acc mean` |
-| 07   | H100 All-datasets baseline         | 85.68±1.50       | PARTIAL   | −5.57pp     | Kaggle H100; MUTAG hoàn tất, job dừng ở PROTEINS do `NameError: exit` |
+| 07   | H100 All-datasets baseline         | 87.96±1.11       | ✅ DONE    | −3.29pp     | Kaggle H100; all 6 datasets complete, 119.1 min total wall time |
 | 08   | ASAM/SAM Optimizer                 | —                | TO RUN    | —           | seeks flat minima for better generalization |
-| 09   | Cosine Loss + Anneal VICReg + EMA  | —                | TO RUN    | —           | scale-invariant loss + stabilization |
+| 09   | Cosine Loss + Anneal VICReg + EMA  | 87.42±0.93       | ✅ DONE    | −3.83pp     | Kaggle H100 2026-04-05; cosine pred + VIC anneal 0.05→0 + EMA 0.996→1; **no ZINC** in script |
 | 10   | Stochastic Depth (DropPath)        | —                | TO RUN    | —           | implicit ensemble/regularization for small folds |
 | 11   | Full-dim Poincaré Ball JEPA        | —                | TO RUN    | —           | 512D hyperbolic space with learnable curvature |
 | 12   | Mamba-SSM Patch Encoder            | —                | TO RUN    | —           | Selective State Space for long-range structure |
@@ -60,6 +60,8 @@ Paper gốc (Table 1, Graph-JEPA, Skenderi et al.):
 
 ## Our Experiments — All Datasets (to be filled as experiments run)
 
+**vs paper / “leaderboard” row:** Each cell is compared to **Graph-JEPA (paper)** on **that same dataset** (Table 1, row **Graph-JEPA (paper)**). Filling a whole row with all datasets your script runs is a **full-suite** comparison—not a single-dataset column only. (Bảng MUTAG phía trên: **vs Paper** = so với paper chỉ trên MUTAG; bảng này = đủ cột benchmark mà exp đã chạy.)
+
 | Exp  | PROTEINS | MUTAG    | DD       | REDDIT-B | REDDIT-M5 | IMDB-B   | IMDB-M   | ZINC     |
 |------|----------|----------|----------|----------|-----------|----------|----------|----------|
 | 01   | —        | 86.00±1.60* | —        | —        | —         | —        | —        | —        |
@@ -68,9 +70,9 @@ Paper gốc (Table 1, Graph-JEPA, Skenderi et al.):
 | 04   | —        | 85.75±0.64* | —        | —        | —         | —        | —        | —        |
 | 05   | —        | 86.67±1.33* | —        | —        | —         | —        | —        | —        |
 | 06   | —        | 84.55±1.69* | —        | —        | —         | —        | —        | —        |
-| 07   | CRASH (`NameError: exit`) | 85.68±1.50 | —        | —        | —         | —        | —        | —        |
+| 07   | 73.14±0.52 | 87.96±1.11 | 77.11±0.45 | —        | —         | 72.86±0.37 | 50.93±0.23 | 0.4503±0.0101 |
 | 08   | —        | —        | —        | —        | —         | —        | —        | —        |
-| 09   | —        | —        | —        | —        | —         | —        | —        | —        |
+| 09   | 73.47±1.05 | 87.42±0.93 | 76.57±0.38 | —        | —         | 73.42±0.26 | 50.64±0.36 | —        |
 | 10   | —        | —        | —        | —        | —         | —        | —        | —        |
 | 11   | —        | —        | —        | —        | —         | —        | —        | —        |
 | 12   | —        | —        | —        | —        | —         | —        | —        | —        |
@@ -239,34 +241,100 @@ Paper gốc (Table 1, Graph-JEPA, Skenderi et al.):
 
 ### EXP 07 — HMS-JEPA Baseline, All Datasets (Kaggle H100)
 
-**Setup:** chạy tuần tự các dataset `MUTAG, PROTEINS, IMDB-B, IMDB-M, DD, ZINC` với tối ưu H100 (`metis.online=False`, AMP bfloat16, `cudnn.benchmark=True`, batch lớn hơn). **Kaggle**, 2026-04-04.
+**Setup:** chạy tuần tự các dataset `MUTAG, PROTEINS, IMDB-B, IMDB-M, DD, ZINC` với tối ưu H100 (`metis.online=False`, AMP bfloat16, `cudnn.benchmark=True`, batch lớn hơn). **Kaggle**, 2026-04-05.
 
-**Config nổi bật:** `train.runs=5` cho TUD datasets (riêng ZINC dự kiến 10), `k=10` CV cho classification; `MUTAG` dùng 50 epochs, batch 512.
+**Config nổi bật:** `train.runs=5` cho TUD datasets, `train.runs=10` cho ZINC, `k=10` CV cho classification. Batch sizes: MUTAG/PROTEINS/IMDB-B/IMDB-M/ZINC=512, DD=256.
 
-**Kết quả đã hoàn tất:**
-- **MUTAG:** **85.68±1.50%** (5 runs x 10-fold CV), thấp hơn paper Graph-JEPA (91.25±5.75) **5.57 điểm phần trăm**.
-- Wall time MUTAG: **~9.7 min**.
+**Kết quả tổng hợp (all 6 datasets complete ✅):**
+
+| Dataset    | Result            | Paper              | Δ vs Paper  | Wall time |
+|------------|-------------------|--------------------|-------------|----------|
+| MUTAG      | **87.96±1.11%**   | 91.25±5.75%        | −3.29pp     | 9.2 min  |
+| PROTEINS   | **73.14±0.52%**   | 75.68±3.78%        | −2.54pp     | 23.7 min |
+| IMDB-B     | **72.86±0.37%**   | 73.68±3.24%        | −0.82pp     | 12.5 min |
+| IMDB-M     | **50.93±0.23%**   | 50.69±2.91%        | **+0.24pp** | 25.0 min |
+| DD         | **77.11±0.45%**   | 78.64±2.35%        | −1.53pp     | 32.7 min |
+| ZINC (MAE) | **0.4503±0.0101** | 0.434±0.014        | +0.016      | 16.1 min |
+| **Total**  |                   |                    |             | **119.1 min** |
 
 **Per-run MUTAG (mean acc / std over 10 folds):**
 
 | Run | Mean acc | Std (across folds) |
 |-----|----------|--------------------|
-| 1   | 83.04%   | 9.89%              |
-| 2   | 85.12%   | 9.98%              |
-| 3   | 87.25%   | 4.16%              |
-| 4   | 86.23%   | 5.29%              |
-| 5   | 86.78%   | 5.37%              |
-| **Mean of run means** | **85.68%** | **1.50%** (std of 5 run means) |
+| 1   | 88.30%   | 5.20%              |
+| 2   | 86.67%   | 4.44%              |
+| 3   | 86.67%   | 7.40%              |
+| 4   | 88.83%   | 7.40%              |
+| 5   | 89.36%   | 7.24%              |
+| **Mean of run means** | **87.96%** | **1.11%** (std of 5 run means) |
 
-**Trạng thái các dataset còn lại:**
-- **PROTEINS:** job bị dừng giữa run do lỗi:
-  - `NameError: name 'exit' is not defined`
-  - stack trace trỏ vào `core/get_data.py` nhánh `Dataset not supported.` gọi `exit(1)`.
-- **IMDB-B, IMDB-M, DD, ZINC:** chưa chạy tới do crash ở PROTEINS.
+**Per-run PROTEINS (mean acc / std over 10 folds):**
 
-**Notes nhanh để resume:**
-- Kiểm tra chuỗi tên dataset trong config (`PROTEINS` vs key mà `create_dataset()` hỗ trợ).
-- Sửa `exit(1)` trong `core/get_data.py` thành `sys.exit(1)` hoặc `raise ValueError(...)` để tránh lỗi NameError và có thông báo rõ ràng hơn.
+| Run | Mean acc | Std (across folds) |
+|-----|----------|--------------------|
+| 1   | 73.14%   | 4.51%              |
+| 2   | 73.86%   | 1.98%              |
+| 3   | 72.34%   | 4.40%              |
+| 4   | 72.87%   | 2.93%              |
+| 5   | 73.50%   | 5.30%              |
+| **Mean of run means** | **73.14%** | **0.52%** (std of 5 run means) |
+
+**Per-run IMDB-BINARY (mean acc / std over 10 folds):**
+
+| Run | Mean acc | Std (across folds) |
+|-----|----------|--------------------|
+| 1   | 72.20%   | 5.36%              |
+| 2   | 73.00%   | 3.82%              |
+| 3   | 73.30%   | 4.29%              |
+| 4   | 73.00%   | 3.87%              |
+| 5   | 72.80%   | 4.14%              |
+| **Mean of run means** | **72.86%** | **0.37%** (std of 5 run means) |
+
+**Per-run IMDB-MULTI (mean acc / std over 10 folds):**
+
+| Run | Mean acc | Std (across folds) |
+|-----|----------|--------------------|
+| 1   | 50.73%   | 2.48%              |
+| 2   | 50.93%   | 3.12%              |
+| 3   | 50.67%   | 3.25%              |
+| 4   | 51.00%   | 2.83%              |
+| 5   | 51.33%   | 3.70%              |
+| **Mean of run means** | **50.93%** | **0.23%** (std of 5 run means) |
+
+**Per-run DD (mean acc / std over 10 folds):**
+
+| Run | Mean acc | Std (across folds) |
+|-----|----------|--------------------|
+| 1   | 77.33%   | 2.19%              |
+| 2   | 76.23%   | 2.57%              |
+| 3   | 77.16%   | 2.21%              |
+| 4   | 77.42%   | 1.39%              |
+| 5   | 77.42%   | 2.20%              |
+| **Mean of run means** | **77.11%** | **0.45%** (std of 5 run means) |
+
+**Per-run ZINC (MAE, 10 runs):**
+
+| Run | MAE    |
+|-----|--------|
+| 1   | 0.4628 |
+| 2   | 0.4562 |
+| 3   | 0.4368 |
+| 4   | 0.4301 |
+| 5   | 0.4525 |
+| 6   | 0.4539 |
+| 7   | 0.4519 |
+| 8   | 0.4457 |
+| 9   | 0.4495 |
+| 10  | 0.4639 |
+| **Mean** | **0.4503±0.0101** |
+
+**Observations:**
+- IMDB-MULTI **vượt paper** (+0.24pp) — lần đầu beat paper trên 1 dataset.
+- IMDB-B gần sát paper (−0.82pp) — trong khoảng dao động std của paper (3.24%).
+- DD gần sát paper (−1.53pp) — trong khoảng dao động std của paper (2.35%).
+- MUTAG gap thu hẹp đáng kể so với EXP 01-06 (−3.29pp vs −5.25pp trước đó) nhờ `metis.online=False` + batch lớn hơn.
+- ZINC MAE 0.4503 gần paper (0.434), chênh +3.7% tương đối.
+- Tổng wall time 119.1 min trên H100 — rất hiệu quả cho 6 datasets.
 
 ---
 
@@ -276,7 +344,42 @@ Paper gốc (Table 1, Graph-JEPA, Skenderi et al.):
 ---
 
 ### EXP 09 — Cosine Loss + Annealed VICReg + Cosine EMA Schedule
-**Setup:** `exp_09_h100_cosine_loss.py`. Thay `SmoothL1` bằng **Cosine Similarity**. Anneal `vic_weight` từ 0.05 về 0. EMA momentum schedule 0.996 → 1.0.
+
+**Setup:** `exp_09_h100_cosine_loss.py` trên **Kaggle H100**, 2026-04-05. Clone repo, METIS, PyG wheels. Loss: **negative cosine similarity** (per-target-patch mean) thay `SmoothL1`; **VICReg-lite** variance hinge với trọng số **anneal cosine** 0.05 → 0; **EMA momentum** cosine 0.996 → 1.0; **grad clip** 1.0; AMP bfloat16. Datasets: **MUTAG, PROTEINS, IMDB-BINARY, IMDB-MULTI, DD** (không ZINC). `metis.online=False`, `k=10`, 5 runs × 10-fold CV.
+
+**Kết quả tổng hợp (5 datasets ✅):**
+
+| Dataset      | EXP 09            | Paper              | Δ vs Paper | EXP 07      | Δ vs 07   | Wall time |
+|--------------|-------------------|--------------------|------------|-------------|-----------|-----------|
+| MUTAG        | **87.42±0.93%**   | 91.25±5.75%        | −3.83pp    | 87.96±1.11% | −0.54pp   | 9.1 min   |
+| PROTEINS     | **73.47±1.05%**   | 75.68±3.78%        | −2.21pp    | 73.14±0.52% | **+0.33pp** | 23.8 min |
+| IMDB-BINARY  | **73.42±0.26%**   | 73.68±3.24%        | −0.26pp    | 72.86±0.37% | **+0.56pp** | 12.8 min |
+| IMDB-MULTI   | **50.64±0.36%**   | 50.69±2.91%        | −0.05pp    | 50.93±0.23% | −0.29pp   | 24.2 min |
+| DD           | **76.57±0.38%**   | 78.64±2.35%        | −2.07pp    | 77.11±0.45% | −0.54pp   | 33.1 min |
+| **Total**    |                   |                    |            |             |           | **103.1 min** |
+
+**Tracker lines (copy-paste):**
+
+- `[TRACKER] MUTAG: 87.42+/-0.93%` — Train Loss: 0.0960 ± 0.0125; ~0.19 s/epoch
+- `[TRACKER] PROTEINS: 73.47+/-1.05%` — Train Loss: 0.1145 ± 0.0161; ~0.49 s/epoch
+- `[TRACKER] IMDB-BINARY: 73.42+/-0.26%` — Train Loss: 0.2073 ± 0.0181; ~0.52 s/epoch
+- `[TRACKER] IMDB-MULTI: 50.64+/-0.36%` — Train Loss: 0.2182 ± 0.0163; ~0.62 s/epoch
+- `[TRACKER] DD: 76.57+/-0.38%` — Train Loss: 0.1057 ± 0.0276; ~0.94 s/epoch
+
+**Per-run means (FINAL RESULTS blocks):**
+
+| Dataset     | Run means (%) |
+|-------------|----------------|
+| MUTAG       | 86.67, 88.80, 87.72, 87.75, 86.14 → **87.42±0.93** |
+| PROTEINS    | 72.42, 74.13, 71.98, 74.58, 74.22 → **73.47±1.05** |
+| IMDB-BINARY | 73.00, 73.70, 73.40, 73.70, 73.30 → **73.42±0.26** |
+| IMDB-MULTI  | 50.53, 50.07, 51.13, 50.87, 50.60 → **50.64±0.36** |
+| DD          | 76.82, 76.57, 76.40, 75.97, 77.08 → **76.57±0.38** |
+
+**Observations:**
+- **PROTEINS** và **IMDB-BINARY** nhích **cao hơn EXP 07** (+0.33pp / +0.56pp); MUTAG, IMDB-M, DD **thấp hơn** nhẹ so với 07.
+- IMDB-MULTI gần **sát paper** (−0.05pp) — trong nhiễu thống kê của paper.
+- Tổng wall **103.1 min** (ước ~65 min trong comment script — thực tế dài hơn, có thể do I/O Kaggle / log).
 
 ---
 

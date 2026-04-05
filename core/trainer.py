@@ -193,6 +193,13 @@ def run(cfg, create_dataset, create_model, train, test, evaluator=None):
         logger.info(f'{cfg.dataset} MAE: {maes.mean():.4f} +/- {maes.std():.4f}')
 
     print(f"{'='*70}\n")
+    return {
+        "regression": True,
+        "mean": float(maes.mean()),
+        "std": float(maes.std()),
+        "dataset": cfg.dataset,
+    }
+
 
 def count_parameters(model):
     # For counting number of parameteres: need to remove unnecessary DiscreteEncoder, and other additional unused params
@@ -456,3 +463,9 @@ def run_k_fold(cfg, create_dataset, create_model, train, test, evaluator=None, k
         logger.info(f'{cfg.dataset} ACCURACY: {overall_mean:.2f} +/- {overall_std:.2f}%')
 
     print(f"{'='*70}\n")
+    return {
+        "regression": False,
+        "mean": float(overall_mean),
+        "std": float(overall_std),
+        "dataset": cfg.dataset,
+    }

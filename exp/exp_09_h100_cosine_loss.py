@@ -80,6 +80,7 @@ from core.get_data import create_dataset
 from core.get_model import create_model
 from torch_geometric.loader import DataLoader
 from core.trainer import run_k_fold, run, k_fold
+from core.tracker_footer import print_exp_tracker_footer
 from core.model import GraphHMSJepa
 
 # ─────────────────────────────────────────────────────────────
@@ -543,6 +544,7 @@ if __name__ == "__main__":
             sys.exit(0)
 
     wall_times = {}
+    tracker_results = {}
     total_start = time.time()
 
     for dataset_name in DATASETS_TO_RUN:
@@ -569,9 +571,13 @@ if __name__ == "__main__":
 
         is_regression = (dataset_name == "ZINC")
         if is_regression:
-            run(updated_cfg, create_dataset, create_model, _train_with_schedule, test)
+            tracker_results[dataset_name] = run(
+                updated_cfg, create_dataset, create_model, _train_with_schedule, test
+            )
         else:
-            run_k_fold(updated_cfg, create_dataset, create_model, _train_with_schedule, test)
+            tracker_results[dataset_name] = run_k_fold(
+                updated_cfg, create_dataset, create_model, _train_with_schedule, test
+            )
 
         ds_elapsed = time.time() - ds_start
         wall_times[dataset_name] = ds_elapsed
@@ -585,4 +591,8 @@ if __name__ == "__main__":
     for ds, t in wall_times.items():
         print(f"  {ds:<12}  {t / 60:>9.1f}m")
     print(f"{'=' * 70}")
-    print("  [TRACKER] Copy results above into tracker.md → EXP 09 row")
+    print_exp_tracker_footer(
+        9,
+        "Cosine Loss + Annealed VICReg + Cosine EMA Schedule",
+        tracker_results,
+    )
