@@ -6,22 +6,26 @@
 
 ---
 
-## Table 1 Comparison — Classification Accuracy (%)
+## Table 1 — Paper baselines + our experiments (unified)
 
-Paper gốc (Table 1, Graph-JEPA, Skenderi et al.):
+Cùng một bảng để so **trực tiếp** với Table 1 trong paper (Skenderi et al.; bản gốc xem `Original_Paper.md` / arXiv:2309.16014). Hàng **Graph-JEPA (paper)** là baseline gốc; các hàng **Ours — Exp …** là chạy trong repo này (cùng cột, cùng metric). **Δ vs paper:** với classification, lấy *mean* của mình trừ *mean* của paper (cùng dataset) → điểm phần trăm (pp); với ZINC (MAE), so sánh số MAE (thấp hơn = tốt hơn). Ô **—** = chưa chạy / không có trong paper.
 
-| Method               | PROTEINS | MUTAG        | DD           | REDDIT-B     | REDDIT-M5    | IMDB-B       | IMDB-M       | ZINC (MAE) |
-|----------------------|----------|--------------|--------------|--------------|--------------|--------------|--------------|------------|
-| F-GIN (supervised)   | 72.39±2.76 | 90.41±4.61 | 74.87±3.56 | 86.79±2.04 | 53.28±3.17 | 71.83±1.93 | 48.46±2.31 | 0.254±0.005 |
-| InfoGraph            | 72.57±0.65 | 87.71±1.77 | 75.23±0.39 | 78.79±2.14 | 51.11±0.55 | 71.11±0.88 | 48.66±0.67 | 0.890±0.017 |
-| GraphCL              | 72.86±1.01 | 88.29±1.31 | 74.70±0.70 | 82.63±0.99 | 53.05±0.40 | 70.80±0.77 | 48.49±0.63 | 0.627±0.013 |
-| MVGRL                | —        | —            | —            | 84.5±0.6   | —            | 74.2±0.7   | 51.2±0.5   | —          |
-| AD-GCL-FIX           | 73.59±0.65 | 89.25±1.45 | 74.49±0.52 | 85.52±0.79 | 53.00±0.82 | 71.57±1.01 | 49.04±0.53 | 0.578±0.012 |
-| AD-GCL-OPT           | 73.81±0.46 | 89.70±1.03 | 75.10±0.39 | 85.52±0.79 | 54.93±0.43 | 72.33±0.56 | 49.89±0.66 | 0.544±0.004 |
-| GraphMAE             | 75.30±0.39 | 88.19±1.26 | 74.27±1.07 | 88.01±0.19 | 46.06±3.44 | 75.52±0.66 | 51.63±0.52 | 0.935±0.034 |
-| S2GAE                | 76.37±0.43 | 88.26±0.76 | —            | 87.83±0.27 | —            | 75.76±0.62 | 51.79±0.36 | —          |
-| LaGraph              | 75.2±0.4 | 90.2±1.1   | 78.1±0.4   | 90.4±0.8   | 56.4±0.4   | 73.7±0.9   | —            | —          |
+| Method | PROTEINS | MUTAG | DD | REDDIT-B | REDDIT-M5 | IMDB-B | IMDB-M | ZINC (MAE) |
+|--------|----------|-------|-----|----------|-----------|--------|--------|------------|
+| F-GIN (supervised) | 72.39±2.76 | 90.41±4.61 | 74.87±3.56 | 86.79±2.04 | 53.28±3.17 | 71.83±1.93 | 48.46±2.31 | 0.254±0.005 |
+| InfoGraph | 72.57±0.65 | 87.71±1.77 | 75.23±0.39 | 78.79±2.14 | 51.11±0.55 | 71.11±0.88 | 48.66±0.67 | 0.890±0.017 |
+| GraphCL | 72.86±1.01 | 88.29±1.31 | 74.70±0.70 | 82.63±0.99 | 53.05±0.40 | 70.80±0.77 | 48.49±0.63 | 0.627±0.013 |
+| MVGRL | — | — | — | 84.5±0.6 | — | 74.2±0.7 | 51.2±0.5 | — |
+| AD-GCL-FIX | 73.59±0.65 | 89.25±1.45 | 74.49±0.52 | 85.52±0.79 | 53.00±0.82 | 71.57±1.01 | 49.04±0.53 | 0.578±0.012 |
+| AD-GCL-OPT | 73.81±0.46 | 89.70±1.03 | 75.10±0.39 | 85.52±0.79 | 54.93±0.43 | 72.33±0.56 | 49.89±0.66 | 0.544±0.004 |
+| GraphMAE | 75.30±0.39 | 88.19±1.26 | 74.27±1.07 | 88.01±0.19 | 46.06±3.44 | 75.52±0.66 | 51.63±0.52 | 0.935±0.034 |
+| S2GAE | 76.37±0.43 | 88.26±0.76 | — | 87.83±0.27 | — | 75.76±0.62 | 51.79±0.36 | — |
+| LaGraph | 75.2±0.4 | 90.2±1.1 | 78.1±0.4 | 90.4±0.8 | 56.4±0.4 | 73.7±0.9 | — | — |
 | **Graph-JEPA (paper)** | **75.68±3.78** | **91.25±5.75** | **78.64±2.35** | **91.99±1.59** | **56.73±1.96** | **73.68±3.24** | **50.69±2.91** | **0.434±0.014** |
+| Ours — Exp 07 (H100 all-datasets baseline) | 73.14±0.52 | 87.96±1.11 | 77.11±0.45 | — | — | 72.86±0.37 | 50.93±0.23 | 0.4503±0.0101 |
+| Ours — Exp 09 (Cosine + anneal VICReg + EMA) | 73.47±1.05 | 87.42±0.93 | 76.57±0.38 | — | — | 73.42±0.26 | 50.64±0.36 | — |
+
+*(Các exp chỉ MUTAG hoặc chưa chạy đủ suite: xem bảng «Our Experiments — MUTAG» và bảng index Exp 01–14 bên dưới.)*
 
 ---
 
@@ -58,9 +62,11 @@ Paper gốc (Table 1, Graph-JEPA, Skenderi et al.):
 
 ---
 
-## Our Experiments — All Datasets (to be filled as experiments run)
+## Our Experiments — All Datasets (index by Exp ID)
 
-**vs paper / “leaderboard” row:** Each cell is compared to **Graph-JEPA (paper)** on **that same dataset** (Table 1, row **Graph-JEPA (paper)**). Filling a whole row with all datasets your script runs is a **full-suite** comparison—not a single-dataset column only. (Bảng MUTAG phía trên: **vs Paper** = so với paper chỉ trên MUTAG; bảng này = đủ cột benchmark mà exp đã chạy.)
+**So với paper:** Hàng **Exp 07 / Exp 09** (đủ cột đã chạy) nằm trong **Table 1 — Paper baselines + our experiments (unified)** phía trên, cạnh Graph-JEPA (paper) và các baseline. Bảng dưới là **lưới Exp 01–14** theo ID; số trùng với hàng «Ours» trong Table 1 unified.
+
+**vs paper / “leaderboard” row:** Mỗi ô so với **Graph-JEPA (paper)** cùng cột trong Table 1 unified. (Bảng MUTAG-only: **vs Paper** chỉ trên MUTAG.)
 
 | Exp  | PROTEINS | MUTAG    | DD       | REDDIT-B | REDDIT-M5 | IMDB-B   | IMDB-M   | ZINC     |
 |------|----------|----------|----------|----------|-----------|----------|----------|----------|
