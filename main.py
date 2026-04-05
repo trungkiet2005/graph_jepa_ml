@@ -2633,7 +2633,10 @@ def test_exp(loader, model, evaluator=None, device='cpu', criterion_type=0):
 def k_fold(dataset, folds=10):
     skf = StratifiedKFold(folds, shuffle=True, random_state=12345)
     train_indices, test_indices = [], []
-    ys = dataset.data.y
+    y = getattr(dataset, "y", None)
+    if y is None:
+        y = dataset.data.y
+    ys = y.view(-1).detach().cpu().numpy() if isinstance(y, torch.Tensor) else np.asarray(y).reshape(-1)
     for train, test in skf.split(torch.zeros(len(dataset)), ys):
         train_indices.append(torch.from_numpy(train).to(torch.long))
         test_indices.append(torch.from_numpy(test).to(torch.long))

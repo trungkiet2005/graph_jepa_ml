@@ -9,6 +9,8 @@ from torch_geometric.loader import DataLoader
 from sklearn.model_selection import StratifiedKFold
 from sklearn.linear_model import Ridge, LogisticRegression
 from sklearn.metrics import accuracy_score, mean_absolute_error
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 def set_seed(seed):
     random.seed(seed)
@@ -197,10 +199,22 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
+def _graph_labels_numpy(dataset):
+    """Graph-level labels for stratified split (avoids InMemoryDataset.data access warning)."""
+    y = getattr(dataset, "y", None)
+    if y is None:
+        y = dataset.data.y
+    if isinstance(y, torch.Tensor):
+        y = y.view(-1).detach().cpu().numpy()
+    else:
+        y = np.asarray(y).reshape(-1)
+    return y
+
+
 def k_fold(dataset, folds=10):
     skf = StratifiedKFold(folds, shuffle=True, random_state=12345)
     train_indices, test_indices = [], []
-    ys = dataset.data.y
+    ys = _graph_labels_numpy(dataset)
     for train, test in skf.split(torch.zeros(len(dataset)), ys):
         train_indices.append(torch.from_numpy(train).to(torch.long))
         test_indices.append(torch.from_numpy(test).to(torch.long))
@@ -352,7 +366,10 @@ def run_k_fold(cfg, create_dataset, create_model, train, test, evaluator=None, k
             X_test = np.concatenate(X_test, axis=0)
             y_test = np.concatenate(y_test, axis=0)
 
-            lin_model = LogisticRegression(max_iter=10000)
+            lin_model = make_pipeline(
+                StandardScaler(),
+                LogisticRegression(max_iter=5000, solver="lbfgs", random_state=0),
+            )
             lin_model.fit(X_train, y_train)
             lin_predictions = lin_model.predict(X_test)
             lin_accuracy = accuracy_score(y_test, lin_predictions)
