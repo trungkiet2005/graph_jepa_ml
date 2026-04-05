@@ -35,7 +35,7 @@
 #   4. Auxiliary graph-level NT-Xent loss (temperature=0.1) on L2 embeddings
 #      of two random patches as graph-level "views"
 #
-# Datasets: MUTAG, PROTEINS, IMDB-BINARY, IMDB-MULTI, DD (no ZINC)
+# Datasets: MUTAG, PROTEINS, IMDB-BINARY, IMDB-MULTI, DD, ZINC
 # ============================================================
 
 import os, sys, subprocess, time, math
@@ -63,7 +63,7 @@ from core.config import cfg, update_cfg
 from core.get_data import create_dataset
 from core.get_model import create_model
 from torch_geometric.loader import DataLoader
-from core.trainer import run_k_fold, k_fold
+from core.trainer import run_k_fold, run, k_fold
 from core.model import GraphHMSJepa
 from core.model_utils.elements import MLP
 from train.zinc import _ema_update
@@ -534,9 +534,43 @@ jepa:
   var_weight: 0.01
 device: 0
 """,
+    "ZINC": """
+dataset: ZINC
+num_workers: 4
+model:
+  gMHA_type: Hadamard
+  gnn_type: GINEConv
+  nlayer_gnn: 2
+  nlayer_mlpmixer: 4
+  hidden_size: 512
+train:
+  lr_patience: 20
+  epochs: 30
+  batch_size: 512
+  lr: 0.0005
+  runs: 10
+metis:
+  n_patches: 32
+  online: False
+pos_enc:
+  rw_dim: 20
+  patch_rw_dim: 20
+  lap_dim: 0
+  patch_num_diff: 0
+jepa:
+  num_context: 1
+  num_targets: 4
+  num_scales: 3
+  scale_factor: 4
+  loss_weights: [1.0, 0.5, 0.25]
+  num_targets_L1: 4
+  num_targets_L2: 1
+  var_weight: 0.01
+device: 0
+""",
 }
 
-DATASETS_TO_RUN = ["MUTAG", "PROTEINS", "IMDB-BINARY", "IMDB-MULTI", "DD"]
+DATASETS_TO_RUN = ["MUTAG", "PROTEINS", "IMDB-BINARY", "IMDB-MULTI", "DD", "ZINC"]
 _PREFLIGHT_MAX_GRAPHS = 24
 
 def _device_tensor(cfg):
@@ -556,13 +590,25 @@ def _merge_cfg_for_dataset(dataset_name):
 
 def preflight_one_dataset(dataset_name):
     cfg = _merge_cfg_for_dataset(dataset_name); device = _device_tensor(cfg)
-    out = create_dataset(cfg); dataset, transform, _ = out
-    train_indices, _ = k_fold(dataset, cfg.k); ti = train_indices[0]
-    n = min(_PREFLIGHT_MAX_GRAPHS, len(ti))
-    subset = dataset[ti[:n]]; subset.transform = transform
-    train_list = [x for x in subset]
-    bs = min(cfg.train.batch_size, max(1, len(train_list)))
-    loader = DataLoader(train_list, batch_size=bs, shuffle=True, num_workers=0, pin_memory=False)
+    out = create_dataset(cfg)
+    if cfg.dataset == "ZINC":
+        train_dataset, _val, _test = out
+        n = min(_PREFLIGHT_MAX_GRAPHS, len(train_dataset))
+        if n < 1:
+            raise RuntimeError(f"ZINC train split empty (len={len(train_dataset)})")
+        small = train_dataset[:n]
+        if not cfg.metis.online:
+            small = [x for x in small]
+        bs = min(cfg.train.batch_size, max(1, len(small)))
+        loader = DataLoader(small, batch_size=bs, shuffle=True, num_workers=0, pin_memory=False)
+    else:
+        dataset, transform, _ = out
+        train_indices, _ = k_fold(dataset, cfg.k); ti = train_indices[0]
+        n = min(_PREFLIGHT_MAX_GRAPHS, len(ti))
+        subset = dataset[ti[:n]]; subset.transform = transform
+        train_list = [x for x in subset]
+        bs = min(cfg.train.batch_size, max(1, len(train_list)))
+        loader = DataLoader(train_list, batch_size=bs, shuffle=True, num_workers=0, pin_memory=False)
     model = create_model_mcmt(cfg).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.lr)
     scaler = torch.amp.GradScaler("cuda", enabled=USE_AMP)
@@ -626,7 +672,11 @@ if __name__ == "__main__":
         ds_start = time.time()
         print(f"\n{'#'*70}\n#  EXP 13 — MCMT — DATASET: {dataset_name}\n{'#'*70}")
         updated_cfg = _merge_cfg_for_dataset(dataset_name)
-        run_k_fold(updated_cfg, create_dataset, create_model_mcmt, train, test)
+        is_regression = (dataset_name == "ZINC")
+        if is_regression:
+            run(updated_cfg, create_dataset, create_model_mcmt, train, test)
+        else:
+            run_k_fold(updated_cfg, create_dataset, create_model_mcmt, train, test)
         ds_elapsed = time.time() - ds_start
         wall_times[dataset_name] = ds_elapsed
         print(f"\n  [{dataset_name}] wall time: {ds_elapsed/60:.1f} min")
