@@ -79,6 +79,7 @@ from core.get_model import create_model
 from torch_geometric.loader import DataLoader
 
 from core.trainer import run_k_fold, run, k_fold
+from core.tracker_footer import print_exp_tracker_footer
 from train.zinc    import _compute_loss, _ema_update
 
 # ─────────────────────────────────────────────────────────────
@@ -477,7 +478,7 @@ if __name__ == "__main__":
             print("EXP07_PREFLIGHT_ONLY=1 — exiting after successful preflight.")
             sys.exit(0)
 
-    results_summary = {}  # dataset -> (mean, std) or MAE (mean, std)
+    tracker_results = {}
     wall_times = {}
 
     total_start = time.time()
@@ -492,10 +493,13 @@ if __name__ == "__main__":
 
         is_regression = (dataset_name == "ZINC")
         if is_regression:
-            # ZINC uses run() (not k-fold)
-            run(updated_cfg, create_dataset, create_model, train, test)
+            tracker_results[dataset_name] = run(
+                updated_cfg, create_dataset, create_model, train, test
+            )
         else:
-            run_k_fold(updated_cfg, create_dataset, create_model, train, test)
+            tracker_results[dataset_name] = run_k_fold(
+                updated_cfg, create_dataset, create_model, train, test
+            )
 
         ds_elapsed = time.time() - ds_start
         wall_times[dataset_name] = ds_elapsed
@@ -512,4 +516,4 @@ if __name__ == "__main__":
     for ds, t in wall_times.items():
         print(f"  {ds:<12}  {t/60:>9.1f}m")
     print(f"{'='*70}")
-    print("  See [TRACKER] lines above to copy results into tracker.md")
+    print_exp_tracker_footer(7, "H100 all-datasets baseline (HMS-JEPA)", tracker_results)
