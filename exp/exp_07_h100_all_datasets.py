@@ -1,7 +1,7 @@
 # ============================================================
 # EXP 07 — HMS-JEPA Baseline, All Fast Datasets  (Kaggle H100-ready)
 # ============================================================
-# Runs MUTAG, PROTEINS, IMDB-B, IMDB-M, DD, ZINC sequentially.
+# Runs MUTAG, PROTEINS, IMDB-BINARY, IMDB-MULTI, DD, ZINC sequentially.
 # Estimated total wall-clock time on H100 80GB: < 2 hours.
 #
 # Key H100 optimisations applied here:
@@ -14,12 +14,23 @@
 # Estimated runtimes (online=False, H100):
 #   MUTAG     ~  5 min   (188 graphs, 5 runs × 10 folds × 50 epochs)
 #   PROTEINS  ~ 12 min   (1113 graphs, 5r × 10f × 30 epochs)
-#   IMDB-B    ~ 10 min   (1000 graphs, 5r × 10f × 10 epochs)
-#   IMDB-M    ~  7 min   (1500 graphs, 5r × 10f ×  5 epochs)
+#   IMDB-BINARY ~ 10 min   (1000 graphs, 5r × 10f × 10 epochs)
+#   IMDB-MULTI  ~  7 min   (1500 graphs, 5r × 10f ×  5 epochs)
 #   DD        ~ 35 min   (1178 large graphs, 5r × 10f × 20 epochs)
 #   ZINC      ~ 40 min   (12000 graphs, 10 runs × 30 epochs)
 #   ──────────────────────────────────────────────────────
 #   Total     ~109 min   ≈ 1h 49min
+# ============================================================
+#
+# Preflight (recommended on Kaggle before a long run):
+#   Default: run a quick check for every dataset in DATASETS_TO_RUN (load data,
+#   METIS/offline transforms on a tiny subset, one AMP train step), then run the
+#   full experiment. If anything fails, the script exits before wasting GPU time.
+#   EXP07_SKIP_PREFLIGHT=1   — skip the check, run full only (reuse after a green preflight).
+#   EXP07_PREFLIGHT_ONLY=1   — only run the check, then exit 0 (dry run).
+#   EXP07_PREFLIGHT_ZINC_FAST=1 — ZINC preflight only: use metis.online=True so the check
+#       finishes quickly; full run still uses offline METIS from the YAML (default ZINC
+#       preflight follows the YAML and can take a long time on first METIS pass).
 # ============================================================
 
 # ─────────────────────────────────────────────────────────────
@@ -65,7 +76,9 @@ import torch.nn.functional as F
 from core.config   import cfg, update_cfg
 from core.get_data import create_dataset
 from core.get_model import create_model
-from core.trainer  import run_k_fold, run
+from torch_geometric.loader import DataLoader
+
+from core.trainer import run_k_fold, run, k_fold
 from train.zinc    import _compute_loss, _ema_update
 
 # ─────────────────────────────────────────────────────────────
@@ -149,8 +162,8 @@ jepa:
   var_weight: 0.01
 device: 0
 """,
-    "IMDB-B": """
-dataset: IMDB-B
+    "IMDB-BINARY": """
+dataset: IMDB-BINARY
 num_workers: 4
 model:
   gMHA_type: Hadamard
@@ -183,8 +196,8 @@ jepa:
   var_weight: 0.01
 device: 0
 """,
-    "IMDB-M": """
-dataset: IMDB-M
+    "IMDB-MULTI": """
+dataset: IMDB-MULTI
 num_workers: 4
 model:
   gMHA_type: Hadamard
@@ -288,7 +301,114 @@ device: 0
 }
 
 # Datasets to run — comment out any you want to skip
-DATASETS_TO_RUN = ["MUTAG", "PROTEINS", "IMDB-B", "IMDB-M", "DD", "ZINC"]
+DATASETS_TO_RUN = ["MUTAG", "PROTEINS", "IMDB-BINARY", "IMDB-MULTI", "DD", "ZINC"]
+
+# Max graphs to materialize per dataset during preflight (keeps METIS offline cost bounded)
+_PREFLIGHT_MAX_GRAPHS = 24
+
+
+def _device_tensor(cfg):
+    d = cfg.device
+    if isinstance(d, torch.device):
+        return d
+    if isinstance(d, str):
+        return torch.device(d)
+    if isinstance(d, int):
+        return torch.device(f"cuda:{d}" if torch.cuda.is_available() else "cpu")
+    return torch.device("cpu")
+
+
+def _merge_cfg_for_dataset(dataset_name):
+    cfg_yaml = DATASET_CONFIGS[dataset_name]
+    cfg_path = f"/tmp/exp07_{dataset_name.replace('-', '_').lower()}.yaml"
+    with open(cfg_path, "w") as f:
+        f.write(cfg_yaml)
+    from core.config import cfg as _cfg
+    _cfg.defrost()
+    _cfg.merge_from_file(cfg_path)
+    updated_cfg = update_cfg(_cfg, args_str="")
+    updated_cfg.k = 10
+    return updated_cfg
+
+
+def preflight_one_dataset(dataset_name):
+    """Load data + one train step (forward/backward) for this dataset. Raises on failure."""
+    cfg = _merge_cfg_for_dataset(dataset_name)
+    if (
+        cfg.dataset == "ZINC"
+        and os.environ.get("EXP07_PREFLIGHT_ZINC_FAST", "0") == "1"
+    ):
+        cfg.defrost()
+        cfg.metis.online = True
+        cfg.freeze()
+    device = _device_tensor(cfg)
+
+    out = create_dataset(cfg)
+    if cfg.dataset == "ZINC":
+        train_dataset, _val, _test = out
+        n = min(_PREFLIGHT_MAX_GRAPHS, len(train_dataset))
+        if n < 1:
+            raise RuntimeError(f"ZINC train split empty (len={len(train_dataset)})")
+        small = train_dataset[:n]
+        if not cfg.metis.online:
+            small = [x for x in small]
+        bs = min(cfg.train.batch_size, max(1, len(small)))
+        loader = DataLoader(
+            small, batch_size=bs, shuffle=True,
+            num_workers=0, pin_memory=False,
+        )
+    else:
+        dataset, transform, transform_eval = out
+        train_indices, _test_indices = k_fold(dataset, cfg.k)
+        ti = train_indices[0]
+        n = min(_PREFLIGHT_MAX_GRAPHS, len(ti))
+        if n < 1:
+            raise RuntimeError("Preflight fold has no training indices")
+        subset = dataset[ti[:n]]
+        subset.transform = transform
+        if not cfg.metis.online:
+            train_list = [x for x in subset]
+        else:
+            train_list = subset
+        bs = min(cfg.train.batch_size, max(1, len(train_list)))
+        loader = DataLoader(
+            train_list, batch_size=bs, shuffle=True,
+            num_workers=0, pin_memory=False,
+        )
+
+    model = create_model(cfg).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.lr, weight_decay=cfg.train.wd)
+    criterion = torch.nn.SmoothL1Loss(beta=0.5)
+    scaler = torch.amp.GradScaler("cuda", enabled=USE_AMP)
+
+    data = next(iter(loader))
+    if getattr(model, "use_lap", False) and hasattr(data, "lap_pos_enc") and data.lap_pos_enc is not None:
+        batch_pos_enc = data.lap_pos_enc
+        sign_flip = torch.rand(batch_pos_enc.size(1))
+        sign_flip[sign_flip >= 0.5] = 1.0
+        sign_flip[sign_flip < 0.5] = -1.0
+        data.lap_pos_enc = batch_pos_enc * sign_flip.unsqueeze(0)
+    data = data.to(device)
+    optimizer.zero_grad()
+    with torch.amp.autocast("cuda", enabled=USE_AMP, dtype=AMP_DTYPE):
+        loss, _num_t = _compute_loss(model, data, criterion, cfg.jepa.dist)
+    scaler.scale(loss).backward()
+    scaler.step(optimizer)
+    scaler.update()
+
+
+def run_preflight_all():
+    print("\n" + "=" * 70)
+    print("  EXP 07 — PREFLIGHT (all datasets in DATASETS_TO_RUN)")
+    print("=" * 70)
+    t0 = time.time()
+    for name in DATASETS_TO_RUN:
+        t_ds = time.time()
+        print(f"\n  [preflight] {name} ...", flush=True)
+        preflight_one_dataset(name)
+        print(f"  [preflight] {name} OK ({time.time() - t_ds:.1f}s)", flush=True)
+    print(f"\n  Preflight finished in {(time.time() - t0) / 60.0:.1f} min — safe to run full training.\n")
+
 
 # ─────────────────────────────────────────────────────────────
 # 4. TRAIN / TEST LOOPS  (AMP-enabled)
@@ -344,6 +464,19 @@ def test(loader, model, evaluator, device, criterion_type=0):
 # 5. ENTRY POINT
 # ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    skip_pf = os.environ.get("EXP07_SKIP_PREFLIGHT", "0") == "1"
+    pf_only = os.environ.get("EXP07_PREFLIGHT_ONLY", "0") == "1"
+
+    if not skip_pf:
+        try:
+            run_preflight_all()
+        except Exception as e:
+            print(f"\n  PREFLIGHT FAILED: {e!r}", flush=True)
+            raise
+        if pf_only:
+            print("EXP07_PREFLIGHT_ONLY=1 — exiting after successful preflight.")
+            sys.exit(0)
+
     results_summary = {}  # dataset -> (mean, std) or MAE (mean, std)
     wall_times = {}
 
@@ -355,17 +488,7 @@ if __name__ == "__main__":
         print(f"#  DATASET: {dataset_name}")
         print(f"{'#'*70}")
 
-        cfg_yaml = DATASET_CONFIGS[dataset_name]
-        cfg_path = f"/tmp/exp07_{dataset_name.replace('-','_').lower()}.yaml"
-        with open(cfg_path, "w") as f:
-            f.write(cfg_yaml)
-
-        # Reset cfg to defaults before each dataset
-        from core.config import cfg as _cfg
-        _cfg.defrost()
-        _cfg.merge_from_file(cfg_path)
-        updated_cfg = update_cfg(_cfg, args_str="")
-        updated_cfg.k = 10
+        updated_cfg = _merge_cfg_for_dataset(dataset_name)
 
         is_regression = (dataset_name == "ZINC")
         if is_regression:

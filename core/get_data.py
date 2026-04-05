@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 import torch
 from torch_geometric.transforms import Compose, Constant
@@ -6,6 +8,12 @@ from core.config import cfg, update_cfg
 from torch_geometric.datasets import ZINC, TUDataset
 from core.data_utils.exp import PlanarSATPairsDataset
 from core.transform import PositionalEncodingTransform, GraphJEPAPartitionTransform, GraphHMSJEPAPartitionTransform
+
+# Short names used in some experiment scripts → TUDataset `name=` (PyG)
+_TUD_DATASET_ALIASES = {
+    'IMDB-B': 'IMDB-BINARY',
+    'IMDB-M': 'IMDB-MULTI',
+}
 
 
 def calculate_stats(dataset):
@@ -17,6 +25,12 @@ def calculate_stats(dataset):
 
 
 def create_dataset(cfg):
+    ds_name = str(cfg.dataset)
+    if ds_name in _TUD_DATASET_ALIASES:
+        cfg.defrost()
+        cfg.dataset = _TUD_DATASET_ALIASES[ds_name]
+        cfg.freeze()
+
     pre_transform = PositionalEncodingTransform(
         rw_dim=cfg.pos_enc.rw_dim, lap_dim=cfg.pos_enc.lap_dim)
 
@@ -55,7 +69,7 @@ def create_dataset(cfg):
         transform_eval   = _transform_eval
     else:
         print('Not supported...')
-        exit() 
+        sys.exit(1)
 
     if cfg.dataset == 'ZINC':
         root = 'dataset/ZINC'
@@ -79,8 +93,8 @@ def create_dataset(cfg):
         return dataset, transform_train, transform_eval
 
     else:
-        print("Dataset not supported.")
-        exit(1)
+        print(f"Dataset not supported: {cfg.dataset!r}")
+        sys.exit(1)
 
     torch.set_num_threads(cfg.num_workers)
     if not cfg.metis.online:

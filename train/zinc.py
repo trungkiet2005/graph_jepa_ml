@@ -1,3 +1,4 @@
+import sys
 import torch
 import numpy as np
 import torch.nn.functional as F
@@ -23,7 +24,7 @@ def _compute_loss(model, data, criterion, criterion_type):
             l2 = F.mse_loss(tx2, ty2)
         else:
             print('Loss function not supported! Exiting!')
-            exit()
+            sys.exit(1)
         w = model.loss_weights
         loss = w[0] * l0 + w[1] * l1 + w[2] * l2
         # VICReg variance regularisation
@@ -40,7 +41,7 @@ def _compute_loss(model, data, criterion, criterion_type):
             loss = hyperbolic_dist(target_x, target_y)
         else:
             print('Loss function not supported! Exiting!')
-            exit()
+            sys.exit(1)
         num_t = len(target_y)
     return loss, num_t
 
