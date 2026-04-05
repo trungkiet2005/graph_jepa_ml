@@ -29,15 +29,25 @@ Paper gốc (Table 1, Graph-JEPA, Skenderi et al.):
 
 | Exp  | Method                            | MUTAG Acc (%)    | Status    | vs Paper    | Notes |
 |------|-----------------------------------|------------------|-----------|-------------|-------|
-| 01   | HMS-JEPA Baseline (reproduce)     | —                | NOT RUN   | —           | Baseline reproduction |
+| 01   | HMS-JEPA Baseline (reproduce)     | 86.00±1.60*      | 4/5 runs  | −5.25pp     | Kaggle 2026-04-04; batch 128, `metis.online: True`; run 4 log bị cắt |
 | 02   | VICReg Regularization (C-JEPA)    | 87.09±6.51*      | 4/5 runs  | -4.16pp     | Loss scale ~4M — VICReg cov term quá mạnh |
-| 03   | Layer-wise Attention Pool          | —                | NOT RUN   | —           | — |
-| 04   | Multi-view Re-masking             | —                | NOT RUN   | —           | — |
-| 05   | Adaptive Loss Weights (Kendall)   | 86.67±1.33       | DONE (4 runs) | −4.58pp | Kaggle 2026-04-04; `train.runs: 5` nhưng log chỉ có 4 run hoàn chỉnh |
-| 06   | Combined (VICReg+LayerAttn+Adapt) | 84.30±1.72       | DONE (4 runs) | −6.95pp | Kaggle 2026-04-04; `train.runs: 5` nhưng log chỉ có 4 run hoàn chỉnh |
+| 03   | Layer-wise Attention Pool          | 84.56±1.38*      | 4/5 runs  | −6.69pp     | Kaggle 2026-04-04; `GraphHMSJepaLayerAttn`, `metis.online: True`; run 4 chưa có `Acc mean` |
+| 04   | Multi-view Re-masking             | 85.75±0.64*      | 4/5 runs  | −5.50pp     | Kaggle 2026-04-04; `GraphHMSJepaMultiView`, K=4 views, drop 0.15; `metis.online: True`; run 4 chưa có `Acc mean` |
+| 05   | Adaptive Loss Weights (Kendall)   | 86.67±1.33*      | 4/5 runs  | −4.58pp     | Kaggle 2026-04-04; `GraphHMSJepaAdaptive`, Kendall uncertainty; `metis.online: True`; run 4 chưa có `Acc mean` |
+| 06   | Combined (VICReg+LayerAttn+Adapt) | 84.55±1.69*      | 4/5 runs  | −6.70pp     | Kaggle 2026-04-04; `GraphHMSJepaCombined`, VICReg trên pred + Kendall + layer-attn; `metis.online: True`; run 4 chưa có `Acc mean` |
 | 07   | H100 All-datasets baseline         | 85.68±1.50       | PARTIAL   | −5.57pp     | Kaggle H100; MUTAG hoàn tất, job dừng ở PROTEINS do `NameError: exit` |
 
 *exp02: only 4/5 runs completed. Run 4 chưa xong. Avg of runs 0-3: (88.27+86.67+85.15+88.25)/4 = 87.09%
+
+*exp01: only 4/5 runs completed (run 4 chưa có dòng `Acc mean`). Aggregate từ runs 0–3: mean of run means **86.00%**, std **1.60%**.
+
+*exp03: only 4/5 runs completed (run 4 không có dòng `Acc mean` trong log). Aggregate từ runs 0–3: **84.56±1.38%** (std của 4 giá trị mean theo run).
+
+*exp04: only 4/5 runs completed (run 4 log cắt trước khi có `Acc mean`). Aggregate từ runs 0–3: **85.75±0.64%** (std của 4 giá trị mean theo run).
+
+*exp05: only 4/5 runs completed (run 4 log cắt trước khi có `Acc mean`). Aggregate từ runs 0–3: **86.67±1.33%** (std của 4 giá trị mean theo run).
+
+*exp06: only 4/5 runs completed (run 4 chưa có `Acc mean` trong log). Aggregate từ runs 0–3: **84.55±1.69%** (std của 4 giá trị mean theo run).
 
 ---
 
@@ -45,17 +55,40 @@ Paper gốc (Table 1, Graph-JEPA, Skenderi et al.):
 
 | Exp  | PROTEINS | MUTAG    | DD       | REDDIT-B | REDDIT-M5 | IMDB-B   | IMDB-M   | ZINC     |
 |------|----------|----------|----------|----------|-----------|----------|----------|----------|
-| 01   | —        | —        | —        | —        | —         | —        | —        | —        |
+| 01   | —        | 86.00±1.60* | —        | —        | —         | —        | —        | —        |
 | 02   | —        | 87.09*   | —        | —        | —         | —        | —        | —        |
-| 03   | —        | —        | —        | —        | —         | —        | —        | —        |
-| 04   | —        | —        | —        | —        | —         | —        | —        | —        |
-| 05   | —        | 86.67±1.33 | —        | —        | —         | —        | —        | —        |
-| 06   | —        | 84.30±1.72 | —        | —        | —         | —        | —        | —        |
+| 03   | —        | 84.56±1.38* | —        | —        | —         | —        | —        | —        |
+| 04   | —        | 85.75±0.64* | —        | —        | —         | —        | —        | —        |
+| 05   | —        | 86.67±1.33* | —        | —        | —         | —        | —        | —        |
+| 06   | —        | 84.55±1.69* | —        | —        | —         | —        | —        | —        |
 | 07   | CRASH (`NameError: exit`) | 85.68±1.50 | —        | —        | —         | —        | —        | —        |
 
 ---
 
 ## Detailed Run Logs
+
+### EXP 01 — HMS-JEPA Baseline (MUTAG reproduce)
+
+**Setup:** `exp_01_hms_jepa_mutag.py` trên **Kaggle**, 2026-04-04. Clone repo, METIS qua `libmetis-dev`, PyG wheels.
+
+**Config (inline YAML):** `dataset: MUTAG`, Hadamard, GINEConv, hidden=512, nlayer_gnn=2, nlayer_mlpmixer=4, `n_patches: 32`, RWSE 15/15, `jepa` như baseline; `train`: epochs=50, lr=5e-4, **batch_size=128**, `runs: 5`; `k=10` (10-fold CV). Config in được merge với default → **`metis.online: True`**.
+
+**Aggregate (mean ± std của các giá trị mean accuracy theo run, 4 run hoàn chỉnh):** **86.00±1.60%** (paper Graph-JEPA MUTAG: **91.25±5.75%**), chênh **~−5.25 điểm phần trăm** so với paper (mean).
+
+**Per-run summary (`Acc mean` / `std` trên 10 fold):**
+
+| Run | Mean acc | Std (across folds) |
+|-----|----------|--------------------|
+| 0   | 88.27%   | 8.68%              |
+| 1   | 85.64%   | 10.85%             |
+| 2   | 85.56%   | 7.11%              |
+| 3   | 84.53%   | 7.05%              |
+| 4   | —        | (log cắt trước khi có summary) |
+| **Mean of run means (runs 0–3)** | **86.00%** | **1.60%** (std of 4 run means) |
+
+**Ghi chú log:** `UserWarning` truy cập `dataset.data.y` trên `InMemoryDataset` (trainer); không làm dừng job.
+
+---
 
 ### EXP 02 — VICReg Regularization (C-JEPA) on MUTAG
 
@@ -84,13 +117,59 @@ Paper gốc (Table 1, Graph-JEPA, Skenderi et al.):
 
 ---
 
+### EXP 03 — Layer-Wise Attention Pooling (HISTOGRAPH-inspired) on MUTAG
+
+**Setup:** notebook Kaggle, 2026-04-04. Clone `graph_jepa_ml`, METIS (`libmetis-dev`), PyG wheels. Model **`GraphHMSJepaLayerAttn`**: pool có trọng số attention trên output từng lớp GNN (`LayerAttentionPool`), còn lại theo HMS-JEPA baseline.
+
+**Config (inline YAML):** `dataset: MUTAG`, Hadamard, GINEConv, hidden=512, `nlayer_gnn: 2`, `nlayer_mlpmixer: 4`, `n_patches: 32`, RWSE 15/15, JEPA multiscale như snippet; `train`: epochs=50, lr=5e-4, batch=128, `runs: 5`, `k=10`. Sau merge với default → **`metis.online: True`**.
+
+**Aggregate (mean ± std của mean accuracy theo run, 4 run hoàn chỉnh):** **84.56±1.38%** (paper Graph-JEPA MUTAG: **91.25±5.75%**), chênh **~−6.69 điểm phần trăm** so với paper (mean).
+
+**Per-run summary (`Acc mean` / `std` trên 10 fold):**
+
+| Run | Mean acc | Std (across folds) |
+|-----|----------|--------------------|
+| 0   | 85.06%   | 5.94%              |
+| 1   | 82.98%   | 7.76%              |
+| 2   | 86.20%   | 7.64%              |
+| 3   | 84.01%   | 7.62%              |
+| 4   | —        | (log cắt trước khi có summary) |
+| **Mean of run means (runs 0–3)** | **84.56%** | **1.38%** (std of 4 run means) |
+
+**Ghi chú log:** `UserWarning` truy cập `dataset.data.y` trên `InMemoryDataset` (`core/trainer.py`); không làm dừng job.
+
+---
+
+### EXP 04 — Multi-View Re-Masking + Stochastic Context Augmentation on MUTAG
+
+**Setup:** notebook Kaggle, 2026-04-04. Model **`GraphHMSJepaMultiView`**: trong training, **K=4** view dropout trên embedding context (L0/L1), `VIEW_DROP_RATE=0.15`, trung bình dự đoán qua các view; eval một view. Loss dùng `_compute_loss_hms` (SmoothL1 multiscale + `var_weight`).
+
+**Config (inline YAML):** `dataset: MUTAG`, Hadamard, GINEConv, hidden=512, `nlayer_gnn: 2`, `nlayer_mlpmixer: 4`, `n_patches: 32`, RWSE 15/15, JEPA như snippet; `train`: epochs=50, lr=5e-4, batch=128, `runs: 5`, `k=10`. Sau merge → **`metis.online: True`**.
+
+**Aggregate (mean ± std của mean accuracy theo run, 4 run hoàn chỉnh):** **85.75±0.64%** (paper Graph-JEPA MUTAG: **91.25±5.75%**), chênh **~−5.50 điểm phần trăm** so với paper (mean).
+
+**Per-run summary (`Acc mean` / `std` trên 10 fold):**
+
+| Run | Mean acc | Std (across folds) |
+|-----|----------|--------------------|
+| 0   | 85.12%   | 7.61%              |
+| 1   | 85.64%   | 5.40%              |
+| 2   | 85.61%   | 10.04%             |
+| 3   | 86.64%   | 8.28%              |
+| 4   | —        | (log cắt trước khi có summary) |
+| **Mean of run means (runs 0–3)** | **85.75%** | **0.64%** (std of 4 run means) |
+
+**Ghi chú log:** `UserWarning` truy cập `dataset.data.y` trên `InMemoryDataset` (`core/trainer.py`); không làm dừng job.
+
+---
+
 ### EXP 05 — Adaptive Loss Weights (Kendall uncertainty) on MUTAG
 
-**Setup:** HMS-JEPA với trọng số loss học theo homoscedastic uncertainty (Kendall et al., CVPR 2018): `L = 0.5 Σ exp(−log σ²_i) L_i + 0.5 Σ log σ²_i`; `GraphHMSJepaAdaptive` + `SmoothL1` JEPA; giữ variance regularization trên target L0 như baseline (`var_weight: 0.01`). **Kaggle**, 2026-04-04.
+**Setup:** HMS-JEPA với trọng số loss học theo homoscedastic uncertainty (Kendall et al., CVPR 2018): `L = 0.5 Σ exp(−log σ²_i) L_i + 0.5 Σ log σ²_i`; model **`GraphHMSJepaAdaptive`** (`log_var_L0/L1/L2` khởi tạo gần prior), `compute_loss_adaptive` dùng `SmoothL1` cho L0/L1/L2 + `var_weight` trên L0 như baseline. **Kaggle**, 2026-04-04.
 
-**Config:** `dataset: MUTAG`, Hadamard, GINEConv, hidden=512, nlayer_gnn=2, nlayer_mlpmixer=4, n_patches=32, epochs=50, lr=5e-4, batch=128, k=10, `jepa.loss_weights: [1,0.5,0.25]` (trong cfg; objective train dùng Kendall adaptive), `train.runs: 5` (log chỉ **4 run** có dòng `Acc mean` đầy đủ).
+**Config (inline YAML):** `dataset: MUTAG`, Hadamard, GINEConv, hidden=512, `nlayer_gnn: 2`, `nlayer_mlpmixer: 4`, `n_patches: 32`, RWSE 15/15, `jepa.loss_weights: [1.0, 0.5, 0.25]`, `var_weight: 0.01`; `train`: epochs=50, lr=5e-4, batch=128, `runs: 5`, `k=10`. Sau merge → **`metis.online: True`**.
 
-**Aggregate (mean ± std của 4 giá trị mean accuracy theo run):** **86.67±1.33%** (paper Graph-JEPA: **91.25±5.75%**).
+**Aggregate (mean ± std của mean accuracy theo run, 4 run hoàn chỉnh):** **86.67±1.33%** (paper Graph-JEPA MUTAG: **91.25±5.75%**), chênh **~−4.58 điểm phần trăm** so với paper (mean).
 
 **Per-run summary (`Acc mean` / `std` trên 10 fold):**
 
@@ -100,26 +179,29 @@ Paper gốc (Table 1, Graph-JEPA, Skenderi et al.):
 | 1   | 86.70%   | 6.46%              |
 | 2   | 88.27%   | 8.36%              |
 | 3   | 85.03%   | 9.06%              |
-| **Mean of run means** | **86.67%** | **1.33%** (std of 4 run means) |
+| 4   | —        | (log cắt trước khi có summary) |
+| **Mean of run means (runs 0–3)** | **86.67%** | **1.33%** (std of 4 run means) |
 
 **Per-fold accuracies — Run 0 only** (%): 73.68, 84.21, 73.68, 89.47, 94.74, 94.74, 89.47, 94.74, 100.00, 72.22.
 
+**Ghi chú log:** `UserWarning` truy cập `dataset.data.y` trên `InMemoryDataset` (`core/trainer.py`); không làm dừng job.
+
 **Observations:**
-- Adaptive-only **cao hơn** EXP 06 combined (~86.7% vs ~84.3%) và **gần** EXP 02 VICReg (~87.1%); vẫn **thấp hơn** paper ~4.6 điểm phần trăm (mean).
-- Precision học được ~**L0≈1.99, L1≈1.00, L2≈0.50** (≈ tỉ lệ 2:1:0.5), sát prior cố định `[1, 0.5, 0.25]` — uncertainty weighting **không** thay đổi mạnh cân bằng so với baseline.
+- Adaptive-only **cao hơn** EXP 06 combined (~86.7% vs ~84.6%) và **gần** EXP 02 VICReg (~87.1%); vẫn **thấp hơn** paper ~4.6 điểm phần trăm (mean).
+- Log in epoch in `[Adaptive weights] L0≈1.99, L1≈1.00, L2≈0.50` (precision ≈ tỉ lệ 2:1:0.5), sát prior cố định `[1, 0.5, 0.25]` — uncertainty weighting **không** thay đổi mạnh cân bằng so với baseline.
 - Std giữa các fold trong một run vẫn lớn (≈6–10%); nên hoàn thành run thứ 5 hoặc cố định seed nếu so sánh với paper.
 
 ---
 
 ### EXP 06 — Combined: VICReg + LayerAttn + Adaptive Weights (MUTAG)
 
-**Setup:** HMS-JEPA + layer-wise attention pooling + Kendall uncertainty weights + VICReg trên `pred_L0/1/2` (var+cov), SmoothL1 JEPA loss. **Kaggle**, 2026-04-04.
+**Setup:** Model **`GraphHMSJepaCombined`**: layer attention pooling trên output từng lớp GNN; trọng số loss Kendall (`get_adaptive_weights`); VICReg (variance hinge + off-diagonal cov) trên `pred_L0`, `pred_L1`, `pred_L2` với hệ số tổng `0.01 * (vicreg_L0 + vicreg_L1 + vicreg_L2)`; JEPA dùng `SmoothL1` (beta=0.5) + uncertainty `0.5*(w0*l0+w1*l1+w2*l2)+reg`. **Kaggle**, 2026-04-04 (log `Time: 2026/04/04 - 10:58`).
 
-**Config:** `dataset: MUTAG`, Hadamard, GINEConv, hidden=512, nlayer_gnn=2, nlayer_mlpmixer=4, n_patches=32, epochs=50, lr=5e-4, batch=128, k=10, `train.runs: 5` (chỉ **4 run** có summary đầy đủ trong log).
+**Config (inline YAML):** `dataset: MUTAG`, Hadamard, GINEConv, hidden=512, `nlayer_gnn: 2`, `nlayer_mlpmixer: 4`, `n_patches: 32`, RWSE 15/15, `jepa.loss_weights: [1.0, 0.5, 0.25]`, `var_weight: 0.01` (trong cfg; VICReg là phần bổ sung trong `compute_loss_combined`); `train`: epochs=50, lr=5e-4, batch=128, `runs: 5`, `k=10`. Sau merge → **`metis.online: True`**.
 
-**Aggregate (mean ± std of the 4 per-run accuracies):** **84.30±1.72%** (paper Graph-JEPA: **91.25±5.75%**).
+**Aggregate (mean ± std của mean accuracy theo run, 4 run hoàn chỉnh):** **84.55±1.69%** (paper Graph-JEPA MUTAG: **91.25±5.75%**), chênh **~−6.70 điểm phần trăm** so với paper (mean).
 
-**Per-run summary (library `Acc mean` / `std` over 10 folds):**
+**Per-run summary (`Acc mean` / `std` trên 10 fold):**
 
 | Run | Mean acc | Std (across folds) |
 |-----|----------|--------------------|
@@ -127,14 +209,17 @@ Paper gốc (Table 1, Graph-JEPA, Skenderi et al.):
 | 1   | 82.43%   | 6.83%              |
 | 2   | 83.98%   | 5.51%              |
 | 3   | 85.61%   | 9.47%              |
-| **Mean of run means** | **84.30%** | **1.72%** (std of 4 run means) |
+| 4   | —        | (log chưa có `Acc mean`) |
+| **Mean of run means (runs 0–3)** | **84.55%** | **1.69%** (std of 4 run means) |
 
-**Per-fold accuracies — Run 0 only** (đủ 10 fold; các run khác tương tự trong log): 94.74, 84.21, 73.68, 78.95, 89.47, 94.74, 89.47, 84.21, 94.44, 77.78 (%).
+**Per-fold accuracies — Run 0 only** (%): 94.74, 84.21, 73.68, 78.95, 89.47, 94.74, 89.47, 84.21, 94.44, 77.78.
+
+**Ghi chú log:** `UserWarning` truy cập `dataset.data.y` trên `InMemoryDataset` (`core/trainer.py`); không làm dừng job. Mỗi epoch train in `[Weights] L0≈1.99, L1≈1.00, L2≈0.50` (precision, drift nhẹ qua training).
 
 **Observations:**
-- Kết hợp 3 ý tưởng **chưa** vượt baseline paper trên MUTAG; mean **thấp hơn** ~7 điểm phần trăm so với paper.
-- Adaptive weights hội tụ gần tỉ lệ ~2:1:0.5 (precision L0 > L1 > L2), tương thích prior `[1, 0.5, 0.25]`.
-- Biến thiên giữa các fold vẫn cao (std trong run tới ~9.5%); cần thêm run thứ 5 hoặc seed cố định để so sánh ổn định với paper.
+- Kết hợp VICReg + layer-attn + adaptive **không** cải thiện so với adaptive-only (EXP 05 ~86.7%) hay VICReg-only (EXP 02 ~87.1%); mean gộp ~**84.6%**, thấp hơn paper ~**6.7** điểm phần trăm — có thể do tương tác loss / scale VICReg trên prediction.
+- Precision adaptive vẫn sát prior ~2:1:0.5 như EXP 05.
+- Std giữa các fold trong một run vẫn lớn (tới ~9.5%); nên hoàn thành run thứ 5 hoặc seed cố định nếu so sánh với paper.
 
 ---
 
