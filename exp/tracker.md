@@ -23,7 +23,15 @@ Cùng một bảng để so **trực tiếp** với Table 1 trong paper (Skender
 | LaGraph | 75.2±0.4 | 90.2±1.1 | 78.1±0.4 | 90.4±0.8 | 56.4±0.4 | 73.7±0.9 | — | — |
 | **Graph-JEPA (paper)** | **75.68±3.78** | **91.25±5.75** | **78.64±2.35** | **91.99±1.59** | **56.73±1.96** | **73.68±3.24** | **50.69±2.91** | **0.434±0.014** |
 | Ours — Exp 07 (H100 all-datasets baseline) | 73.14±0.52 | 87.96±1.11 | 77.11±0.45 | — | — | 72.86±0.37 | 50.93±0.23 | 0.4503±0.0101 |
+| Ours — Exp 08 (ASAM/SAM optimizer) | 73.37±1.07 | 87.77±0.90 | 76.53±0.77 | — | — | 73.50±0.39 | 50.43±0.09 | 0.4645±0.0138 |
 | Ours — Exp 09 (Cosine + anneal VICReg + EMA) | 73.47±1.05 | 87.42±0.93 | 76.57±0.38 | — | — | 73.42±0.26 | 50.64±0.36 | — |
+| Ours — Exp 10 (Stochastic Depth / DropPath) | 72.85±0.66 | 87.64±1.27 | 76.32±0.37 | — | — | 72.66±0.60 | 51.03±0.30 | 0.4623±0.0158 |
+| Ours — Exp 11 (Full-dim Poincaré Ball JEPA) | 73.20±0.64 | 87.83±0.63 | 75.53±0.93 | — | — | 73.50±0.33 | 50.51±0.51 | 0.4648±0.0130 |
+| Ours — Exp 13 (MCMT-JEPA + NT-Xent) | 73.50±1.28 | 88.45±1.34 | 76.04±0.36 | — | — | 73.38±0.40 | 50.97±0.28 | 0.4558±0.0104 |
+| Ours — Exp 15 (Barlow Twins + Cosine LR) | — | — | — | — | — | — | — | — |
+| Ours — Exp 16 (Multi-Crop + Spectral PE) | — | — | — | — | — | — | — | — |
+| Ours — Exp 17 (Latent MixUp + EMA Warmup) | — | — | — | — | — | — | — | — |
+| Ours — Exp 18 (Combined Champion 8DS) | — | — | — | — | — | — | — | — |
 
 *(Các exp chỉ MUTAG hoặc chưa chạy đủ suite: xem bảng «Our Experiments — MUTAG» và bảng index Exp 01–14 bên dưới.)*
 
@@ -40,13 +48,17 @@ Cùng một bảng để so **trực tiếp** với Table 1 trong paper (Skender
 | 05   | Adaptive Loss Weights (Kendall)   | 86.67±1.33*      | 4/5 runs  | −4.58pp     | Kaggle 2026-04-04; `GraphHMSJepaAdaptive`, Kendall uncertainty; `metis.online: True`; run 4 chưa có `Acc mean` |
 | 06   | Combined (VICReg+LayerAttn+Adapt) | 84.55±1.69*      | 4/5 runs  | −6.70pp     | Kaggle 2026-04-04; `GraphHMSJepaCombined`, VICReg trên pred + Kendall + layer-attn; `metis.online: True`; run 4 chưa có `Acc mean` |
 | 07   | H100 All-datasets baseline         | 87.96±1.11       | ✅ DONE    | −3.29pp     | Kaggle H100; all 6 datasets complete, 119.1 min total wall time |
-| 08   | ASAM/SAM Optimizer                 | —                | TO RUN    | —           | seeks flat minima for better generalization |
+| 08   | ASAM/SAM Optimizer                 | 87.77±0.90       | ✅ DONE    | −3.48pp     | Kaggle H100 2026-04-05; full 6 datasets, ASAM default (`rho=0.1`, `eta=0.01`) |
 | 09   | Cosine Loss + Anneal VICReg + EMA  | 87.42±0.93       | ✅ DONE    | −3.83pp     | Kaggle H100 2026-04-05; cosine pred + VIC anneal 0.05→0 + EMA 0.996→1; **no ZINC** in script |
-| 10   | Stochastic Depth (DropPath)        | —                | TO RUN    | —           | implicit ensemble/regularization for small folds |
-| 11   | Full-dim Poincaré Ball JEPA        | —                | TO RUN    | —           | 512D hyperbolic space with learnable curvature |
+| 10   | Stochastic Depth (DropPath)        | 87.64±1.27       | ✅ DONE    | −3.61pp     | Kaggle H100 2026-04-05; per-dataset DropPath rates; 6 datasets, 124.1 min total wall |
+| 11   | Full-dim Poincaré Ball JEPA        | 87.83±0.63       | ✅ DONE    | −3.42pp     | Kaggle H100 2026-04-05; full-dim Poincaré + learnable c per scale; 6 datasets, 116.2 min total wall |
 | 12   | Mamba-SSM Patch Encoder            | —                | TO RUN    | —           | Selective State Space for long-range structure |
-| 13   | Multi-Context JEPA + NT-Xent       | —                | TO RUN    | —           | 2 contexts + auxiliary contrastive loss |
+| 13   | Multi-Context JEPA + NT-Xent       | 88.45±1.34       | ✅ DONE    | −2.80pp     | Kaggle H100; MCMT-JEPA + NT-Xent; 6 datasets, 123.4 min total wall |
 | 14   | Hybrid JEPA + MAE Dual Objective   | —                | TO RUN    | —           | Representation (JEPA) + Feature (MAE) reconstruction |
+| 15   | MCMT-JEPA + Barlow Twins + Cosine LR | —              | TO RUN    | —           | Barlow Twins redundancy reduction (batch-size invariant), proj 512→512→512, cosine LR warmup |
+| 16   | Multi-Crop Spectral PE Fusion      | —                | TO RUN    | —           | 2 local + 1 global context, RWSE+LapPE fusion, bidirectional L2→L1 |
+| 17   | Latent Patch MixUp + EMA Warmup    | —                | TO RUN    | —           | MixUp in latent patch space (α=0.2), EMA 0.99→1.0 cosine, NT-Xent |
+| 18   | Combined Champion (8 datasets)     | —                | TO RUN    | —           | Best-of-all: MCMT + NT-Xent + DropPath 0.03 + EMA 0.99→1.0 + REDDIT |
 
 *exp02: only 4/5 runs completed. Run 4 chưa xong. Avg of runs 0-3: (88.27+86.67+85.15+88.25)/4 = 87.09%
 
@@ -64,7 +76,7 @@ Cùng một bảng để so **trực tiếp** với Table 1 trong paper (Skender
 
 ## Our Experiments — All Datasets (index by Exp ID)
 
-**So với paper:** Hàng **Exp 07 / Exp 09** (đủ cột đã chạy) nằm trong **Table 1 — Paper baselines + our experiments (unified)** phía trên, cạnh Graph-JEPA (paper) và các baseline. Bảng dưới là **lưới Exp 01–14** theo ID; số trùng với hàng «Ours» trong Table 1 unified.
+**So với paper:** Hàng **Exp 07 / Exp 08 / Exp 09 / Exp 10 / Exp 11 / Exp 13** (đủ cột đã chạy) nằm trong **Table 1 — Paper baselines + our experiments (unified)** phía trên, cạnh Graph-JEPA (paper) và các baseline. Bảng dưới là **lưới Exp 01–14** theo ID; số trùng với hàng «Ours» trong Table 1 unified.
 
 **vs paper / “leaderboard” row:** Mỗi ô so với **Graph-JEPA (paper)** cùng cột trong Table 1 unified. (Bảng MUTAG-only: **vs Paper** chỉ trên MUTAG.)
 
@@ -77,13 +89,17 @@ Cùng một bảng để so **trực tiếp** với Table 1 trong paper (Skender
 | 05   | —        | 86.67±1.33* | —        | —        | —         | —        | —        | —        |
 | 06   | —        | 84.55±1.69* | —        | —        | —         | —        | —        | —        |
 | 07   | 73.14±0.52 | 87.96±1.11 | 77.11±0.45 | —        | —         | 72.86±0.37 | 50.93±0.23 | 0.4503±0.0101 |
-| 08   | —        | —        | —        | —        | —         | —        | —        | —        |
+| 08   | 73.37±1.07 | 87.77±0.90 | 76.53±0.77 | —        | —         | 73.50±0.39 | 50.43±0.09 | 0.4645±0.0138 |
 | 09   | 73.47±1.05 | 87.42±0.93 | 76.57±0.38 | —        | —         | 73.42±0.26 | 50.64±0.36 | —        |
-| 10   | —        | —        | —        | —        | —         | —        | —        | —        |
-| 11   | —        | —        | —        | —        | —         | —        | —        | —        |
+| 10   | 72.85±0.66 | 87.64±1.27 | 76.32±0.37 | —        | —         | 72.66±0.60 | 51.03±0.30 | 0.4623±0.0158 |
+| 11   | 73.20±0.64 | 87.83±0.63 | 75.53±0.93 | —        | —         | 73.50±0.33 | 50.51±0.51 | 0.4648±0.0130 |
 | 12   | —        | —        | —        | —        | —         | —        | —        | —        |
-| 13   | —        | —        | —        | —        | —         | —        | —        | —        |
+| 13   | 73.50±1.28 | 88.45±1.34 | 76.04±0.36 | —        | —         | 73.38±0.40 | 50.97±0.28 | 0.4558±0.0104 |
 | 14   | —        | —        | —        | —        | —         | —        | —        | —        |
+| 15   | —        | —        | —        | —        | —         | —        | —        | —        |
+| 16   | —        | —        | —        | —        | —         | —        | —        | —        |
+| 17   | —        | —        | —        | —        | —         | —        | —        | —        |
+| 18   | —        | —        | —        | —        | —         | —        | —        | —        |
 
 ---
 
@@ -345,7 +361,46 @@ Cùng một bảng để so **trực tiếp** với Table 1 trong paper (Skender
 ---
 
 ### EXP 08 — ASAM/SAM Optimizer
-**Setup:** `exp_08_h100_sam_optimizer.py`. Sử dụng `ASAM` (Adaptive Sharpness-Aware Minimization) thay cho Adam để tìm flat minima.
+
+**Setup:** `exp_08_h100_sam_optimizer.py` trên **Kaggle H100**, 2026-04-05. Dùng vòng lặp **2-step SAM/ASAM** (ascent + descent mỗi batch) với AMP bfloat16, giữ nguyên EMA update; mặc định chạy **ASAM** (`rho=0.1`, `eta=0.01`). Có preflight toàn bộ dataset trước khi train full.
+
+**Kết quả tổng hợp (6 datasets complete ✅):**
+
+| Dataset      | EXP 08            | Paper              | Δ vs Paper | EXP 07      | Δ vs 07   | Wall time |
+|--------------|-------------------|--------------------|------------|-------------|-----------|-----------|
+| MUTAG        | **87.77±0.90%**   | 91.25±5.75%        | −3.48pp    | 87.96±1.11% | −0.19pp   | 11.1 min  |
+| PROTEINS     | **73.37±1.07%**   | 75.68±3.78%        | −2.31pp    | 73.14±0.52% | **+0.23pp** | 27.1 min |
+| IMDB-BINARY  | **73.50±0.39%**   | 73.68±3.24%        | −0.18pp    | 72.86±0.37% | **+0.64pp** | 13.6 min |
+| IMDB-MULTI   | **50.43±0.09%**   | 50.69±2.91%        | −0.26pp    | 50.93±0.23% | −0.50pp   | 25.1 min |
+| DD           | **76.53±0.77%**   | 78.64±2.35%        | −2.11pp    | 77.11±0.45% | −0.58pp   | 38.6 min |
+| ZINC (MAE)   | **0.4645±0.0138** | 0.434±0.014        | +0.0305    | 0.4503±0.0101 | +0.0142 | 21.8 min |
+| **Total**    |                   |                    |            |             |           | **137.3 min** |
+
+**Tracker lines (copy-paste):**
+
+- `[TRACKER] MUTAG: 87.77+/-0.90%` (5 runs, 10-fold CV, 50ep)
+- `[TRACKER] PROTEINS: 73.37+/-1.07%` (5 runs, 10-fold CV, 30ep)
+- `[TRACKER] IMDB-BINARY: 73.50+/-0.39%` (5 runs, 10-fold CV, 10ep)
+- `[TRACKER] IMDB-MULTI: 50.43+/-0.09%` (5 runs, 10-fold CV, 5ep)
+- `[TRACKER] DD: 76.53+/-0.77%` (5 runs, 10-fold CV, 20ep)
+- `[TRACKER] ZINC: MAE=0.4645+/-0.0138` (10 runs, 30ep)
+
+**Per-run means (FINAL RESULTS blocks):**
+
+| Dataset     | Run means |
+|-------------|-----------|
+| MUTAG       | 87.81, 87.81, 86.14, 88.83, 88.27 -> **87.77±0.90** |
+| PROTEINS    | 73.59, 73.14, 74.75, 73.86, 71.52 -> **73.37±1.07** |
+| IMDB-BINARY | 73.30, 73.00, 73.80, 74.10, 73.30 -> **73.50±0.39** |
+| IMDB-MULTI  | 50.40, 50.60, 50.40, 50.40, 50.33 -> **50.43±0.09** |
+| DD          | 76.99, 75.38, 76.14, 77.67, 76.48 -> **76.53±0.77** |
+| ZINC (MAE)  | 0.5015, 0.4634, 0.4465, 0.4648, 0.4609, 0.4690, 0.4553, 0.4596, 0.4672, 0.4563 -> **0.4645±0.0138** |
+
+**Observations:**
+- So với EXP 07, EXP 08 cải thiện nhẹ trên **PROTEINS** (+0.23pp) và **IMDB-BINARY** (+0.64pp), nhưng giảm trên MUTAG/DD/IMDB-M và ZINC MAE xấu hơn.
+- IMDB-BINARY tiến rất sát paper (−0.18pp), nhưng IMDB-MULTI không giữ được mức vượt paper như EXP 07.
+- Tổng wall time **137.3 min**, dài hơn EXP 07 (119.1 min), phù hợp chi phí 2-step SAM/ASAM.
+- Mục tiêu "flat minima" chưa cho gain đồng đều across datasets trong cấu hình hiện tại (`rho=0.1`, ASAM default).
 
 ---
 
@@ -390,12 +445,104 @@ Cùng một bảng để so **trực tiếp** với Table 1 trong paper (Skender
 ---
 
 ### EXP 10 — Stochastic Depth (DropPath)
-**Setup:** `exp_10_h100_stochastic_depth.py`. Thêm `DropPath` vào các lớp GNN residual and Mixer blocks.
+
+**Setup:** `exp_10_h100_stochastic_depth.py` trên **Kaggle H100**, 2026-04-05. Thêm **DropPath** (stochastic depth) trên residual GNN và Mixer; tốc độ **gnn_dp / mixer_dp** khác nhau theo dataset (nhỏ hơn trên DD/ZINC). Preflight ~2.1 min.
+
+**DropPath rates (log script):**
+
+| Dataset     | gnn_dp | mixer_dp |
+|-------------|--------|----------|
+| MUTAG       | 0.15   | 0.10     |
+| PROTEINS    | 0.10   | 0.08     |
+| IMDB-BINARY | 0.10   | 0.08     |
+| IMDB-MULTI  | 0.08   | 0.05     |
+| DD          | 0.05   | 0.05     |
+| ZINC        | 0.03   | 0.03     |
+
+**Kết quả tổng hợp (6 datasets complete ✅):**
+
+| Dataset      | EXP 10            | Paper              | Δ vs Paper | EXP 07      | Δ vs 07   | Wall time |
+|--------------|-------------------|--------------------|------------|-------------|-----------|-----------|
+| MUTAG        | **87.64±1.27%**   | 91.25±5.75%        | −3.61pp    | 87.96±1.11% | −0.32pp   | 10.0 min  |
+| PROTEINS     | **72.85±0.66%**   | 75.68±3.78%        | −2.83pp    | 73.14±0.52% | −0.29pp   | 25.1 min |
+| IMDB-BINARY  | **72.66±0.60%**   | 73.68±3.24%        | −1.02pp    | 72.86±0.37% | −0.20pp   | 13.3 min |
+| IMDB-MULTI   | **51.03±0.30%**   | 50.69±2.91%        | **+0.34pp**| 50.93±0.23% | +0.10pp   | 25.6 min |
+| DD           | **76.32±0.37%**   | 78.64±2.35%        | −2.32pp    | 77.11±0.45% | −0.79pp   | 33.5 min |
+| ZINC (MAE)   | **0.4623±0.0158** | 0.434±0.014        | +0.0283    | 0.4503±0.0101 | +0.0120 | 16.8 min |
+| **Total**    |                   |                    |            |             |           | **124.1 min** |
+
+**Tracker lines (copy-paste):**
+
+- `[TRACKER] MUTAG: 87.64+/-1.27%` (5 runs, 10-fold CV, 50ep)
+- `[TRACKER] PROTEINS: 72.85+/-0.66%` (5 runs, 10-fold CV, 30ep)
+- `[TRACKER] IMDB-BINARY: 72.66+/-0.60%` (5 runs, 10-fold CV, 10ep)
+- `[TRACKER] IMDB-MULTI: 51.03+/-0.30%` (5 runs, 10-fold CV, 5ep)
+- `[TRACKER] DD: 76.32+/-0.37%` (5 runs, 10-fold CV, 20ep)
+- `[TRACKER] ZINC: MAE=0.4623+/-0.0158` (10 runs, 30ep)
+
+**Per-run means (FINAL RESULTS blocks):**
+
+| Dataset     | Run means |
+|-------------|-----------|
+| MUTAG       | 86.70, 86.11, 87.16, 89.42, 88.83 → **87.64±1.27** |
+| PROTEINS    | 73.59, 73.50, 72.33, 72.96, 71.88 → **72.85±0.66** |
+| IMDB-BINARY | 72.30, 72.10, 73.80, 72.50, 72.60 → **72.66±0.60** |
+| IMDB-MULTI  | 51.47, 51.07, 50.53, 51.07, 51.00 → **51.03±0.30** |
+| DD          | 75.72, 76.66, 76.06, 76.66, 76.49 → **76.32±0.37** |
+| ZINC (MAE)  | 0.4818, 0.4555, 0.4759, 0.4560, 0.4271, 0.4703, 0.4510, 0.4564, 0.4684, 0.4804 → **0.4623±0.0158** |
+
+**Observations:**
+- **IMDB-MULTI** vẫn **trên paper** (+0.34pp) và nhích so với EXP 07 (+0.10pp).
+- So với EXP 07, PROTEINS/MUTAG/DD/IMDB-B và ZINC MAE đều **thấp hơn** nhẹ — DropPath không cải thiện đồng đều trong sweep rate hiện tại.
+- Tổng wall **124.1 min**, gần EXP 07 (119.1 min), nhanh hơn EXP 08 SAM (137.3 min).
 
 ---
 
 ### EXP 11 — Full-dimensional Poincaré Ball JEPA
-**Setup:** `exp_11_h100_poincare_ball.py`. Chuyển từ 2D Lorentzian hyperbola sang **512D Poincaré ball** với learnable curvature `c`.
+
+**Setup:** `exp_11_h100_poincare_ball.py` trên **Kaggle H100**, 2026-04-05. **HMS-JEPA** với không gian **Poincaré ball đầy đủ chiều** (full-dim) và **curvature `c` học được theo scale**; GINEConv + Hadamard, `hidden_size=512`, `n_patches=32`, `metis.online=False`, AMP bfloat16. Preflight ~2.0 min; tổng wall **116.2 min** (MUTAG 9.9m, PROTEINS 23.4m, IMDB-B 12.6m, IMDB-M 23.1m, DD 31.6m, ZINC 15.6m).
+
+**Kết quả tổng hợp (6 datasets complete ✅):**
+
+| Dataset      | EXP 11            | Paper              | Δ vs Paper | EXP 07      | Δ vs 07   | Wall time |
+|--------------|-------------------|--------------------|------------|-------------|-----------|-----------|
+| MUTAG        | **87.83±0.63%**   | 91.25±5.75%        | −3.42pp    | 87.96±1.11% | −0.13pp   | 9.9 min   |
+| PROTEINS     | **73.20±0.64%**   | 75.68±3.78%        | −2.48pp    | 73.14±0.52% | **+0.06pp** | 23.4 min |
+| IMDB-BINARY  | **73.50±0.33%**   | 73.68±3.24%        | −0.18pp    | 72.86±0.37% | **+0.64pp** | 12.6 min |
+| IMDB-MULTI   | **50.51±0.51%**   | 50.69±2.91%        | −0.18pp    | 50.93±0.23% | −0.42pp   | 23.1 min |
+| DD           | **75.53±0.93%**   | 78.64±2.35%        | −3.11pp    | 77.11±0.45% | −1.58pp   | 31.6 min |
+| ZINC (MAE)   | **0.4648±0.0130** | 0.434±0.014        | +0.0308    | 0.4503±0.0101 | +0.0145 | 15.6 min |
+| **Total**    |                   |                    |            |             |           | **116.2 min** |
+
+**Tracker lines (copy-paste):**
+
+- `[TRACKER] MUTAG: 87.83+/-0.63%` (5 runs, 10-fold CV, 50ep)
+- `[TRACKER] PROTEINS: 73.20+/-0.64%` (5 runs, 10-fold CV, 30ep)
+- `[TRACKER] IMDB-BINARY: 73.50+/-0.33%` (5 runs, 10-fold CV, 10ep)
+- `[TRACKER] IMDB-MULTI: 50.51+/-0.51%` (5 runs, 10-fold CV, 5ep)
+- `[TRACKER] DD: 75.53+/-0.93%` (5 runs, 10-fold CV, 20ep)
+- `[TRACKER] ZINC: MAE=0.4648+/-0.0130` (10 runs, 30ep)
+- `[TRACKER] REDDIT-B: —` / `[TRACKER] REDDIT-M5: —` (not run)
+
+**Per-run means (FINAL RESULTS blocks):**
+
+| Dataset     | Run means |
+|-------------|-----------|
+| MUTAG       | 87.16, 88.80, 87.19, 87.72, 88.27 → **87.83±0.63** |
+| PROTEINS    | 73.86, 72.15, 73.68, 72.78, 73.50 → **73.20±0.64** |
+| IMDB-BINARY | 73.30, 73.20, 73.20, 74.00, 73.80 → **73.50±0.33** |
+| IMDB-MULTI  | 51.47, 50.13, 50.20, 50.60, 50.13 → **50.51±0.51** |
+| DD          | 75.81, 74.53, 74.36, 76.56, 76.40 → **75.53±0.93** |
+| ZINC (MAE)  | 0.4645, 0.4540, 0.4876, 0.4567, 0.4841, 0.4507, 0.4759, 0.4482, 0.4607, 0.4654 → **0.4648±0.0130** |
+
+**One markdown row (Table 1 / index):**  
+`| 11 | 73.20±0.64 | 87.83±0.63 | 75.53±0.93 | — | — | 73.50±0.33 | 50.51±0.51 | 0.4648±0.0130 |`
+
+**Observations:**
+- **IMDB-BINARY** khớp mức cải thiện so với EXP 07 như EXP 08 (**+0.64pp**); **PROTEINS** nhích nhẹ (+0.06pp vs 07).
+- **DD** và **IMDB-MULTI** thấp hơn EXP 07 rõ hơn (−1.58pp / −0.42pp); **ZINC MAE** xấu hơn 07 (+0.0145).
+- Tổng wall **116.2 min**, nhanh hơn EXP 07 (119.1 min) và EXP 08/10 — phù hợp cùng H100 suite, không SAM/DropPath overhead.
+- Log có `LinAlgWarning` (ill-conditioned matrix) trên ZINC khi tính metric phụ; không chặn training.
 
 ---
 
@@ -405,7 +552,41 @@ Cùng một bảng để so **trực tiếp** với Table 1 trong paper (Skender
 ---
 
 ### EXP 13 — Multi-Context Multi-Target (MCMT) JEPA + NT-Xent
-**Setup:** `exp_13_h100_mcmt_jepa.py`. Sử dụng **2 context patches** predict targets + NT-Xent auxiliary contrastive loss.
+
+**Setup:** `exp_13_h100_mcmt_jepa.py` trên **Kaggle H100**. **MCMT-JEPA**: **2 context patches** dự đoán targets đa tỉ lệ + **NT-Xent** làm contrastive phụ; cùng pipeline HMS-JEPA / METIS như các exp H100 (`metis.online=False`, AMP). **EXP 13 (MCMT-JEPA) COMPLETE** — tổng wall **123.4 min**.
+
+**Wall time theo dataset:** MUTAG 10.4m · PROTEINS 25.3m · IMDB-BINARY 12.6m · IMDB-MULTI 23.5m · DD 34.0m · ZINC 17.5m.
+
+**Kết quả tổng hợp (6 datasets complete ✅):**
+
+| Dataset      | EXP 13            | Paper              | Δ vs Paper | EXP 07      | Δ vs 07   | Wall time |
+|--------------|-------------------|--------------------|------------|-------------|-----------|-----------|
+| MUTAG        | **88.45±1.34%**   | 91.25±5.75%        | −2.80pp    | 87.96±1.11% | **+0.49pp** | 10.4 min  |
+| PROTEINS     | **73.50±1.28%**   | 75.68±3.78%        | −2.18pp    | 73.14±0.52% | **+0.36pp** | 25.3 min |
+| IMDB-BINARY  | **73.38±0.40%**   | 73.68±3.24%        | −0.30pp    | 72.86±0.37% | **+0.52pp** | 12.6 min |
+| IMDB-MULTI   | **50.97±0.28%**   | 50.69±2.91%        | **+0.28pp**| 50.93±0.23% | **+0.04pp** | 23.5 min |
+| DD           | **76.04±0.36%**   | 78.64±2.35%        | −2.60pp    | 77.11±0.45% | −1.07pp   | 34.0 min |
+| ZINC (MAE)   | **0.4558±0.0104** | 0.434±0.014        | +0.0218    | 0.4503±0.0101 | +0.0055 | 17.5 min |
+| **Total**    |                   |                    |            |             |           | **123.4 min** |
+
+**Tracker lines (copy-paste):**
+
+- `[TRACKER] PROTEINS: 73.50+/-1.28%`
+- `[TRACKER] MUTAG: 88.45+/-1.34%`
+- `[TRACKER] DD: 76.04+/-0.36%`
+- `[TRACKER] REDDIT-B: —` / `[TRACKER] REDDIT-M5: —` (not run)
+- `[TRACKER] IMDB-BINARY: 73.38+/-0.40%`
+- `[TRACKER] IMDB-MULTI: 50.97+/-0.28%`
+- `[TRACKER] ZINC: MAE=0.4558+/-0.0104`
+
+**One markdown row (Table 1 / index):**  
+`| 13 | 73.50±1.28 | 88.45±1.34 | 76.04±0.36 | — | — | 73.38±0.40 | 50.97±0.28 | 0.4558±0.0104 |`
+
+**Observations:**
+- **MUTAG** cao nhất trong các exp H100 full-suite đã ghi (88.45%), thu hẹp gap paper (−2.80pp vs ~−3.3pp baseline 07).
+- **IMDB-MULTI** lại **trên paper** (+0.28pp) và trên EXP 07 (+0.04pp) — cùng nhóm với 07/10.
+- **PROTEINS** và **IMDB-BINARY** cải thiện so với EXP 07 (+0.36pp / +0.52pp); **DD** thấp hơn 07 (−1.07pp); **ZINC MAE** xấu hơn paper và nhẹ hơn 07 (+0.0055).
+- Wall **123.4 min**, gần EXP 07 (119.1 min).
 
 ---
 
