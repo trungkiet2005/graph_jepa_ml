@@ -52,7 +52,13 @@ from torch_geometric.data import Data, InMemoryDataset
 from torch_geometric.datasets import ZINC, TUDataset
 from torch_geometric.loader import DataLoader
 from torch_geometric.transforms import Compose, Constant
-from torch_scatter import scatter
+from torch_scatter import scatter as _scatter_impl
+
+
+@torch._dynamo.disable
+def scatter(*args, **kwargs):
+    """torch_scatter ops are opaque to torch.compile; run them outside Dynamo."""
+    return _scatter_impl(*args, **kwargs)
 from torch_sparse import SparseTensor
 
 import networkx as nx
@@ -69,6 +75,8 @@ from sklearn.metrics import accuracy_score, mean_absolute_error
 from ogb.graphproppred.mol_encoder import AtomEncoder as AtomEncoder_
 from ogb.graphproppred.mol_encoder import BondEncoder as BondEncoder_
 
+from tqdm.auto import tqdm
+
 
 # ── SECTION 2: Reproducibility seed ─────────────────────────────
 
@@ -79,8 +87,34 @@ def set_seed(seed):
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = False
+    torch.backends.cudnn.benchmark = True
+
+
+def dataloader_num_workers(requested: int) -> int:
+    """Jupyter/IPython runs user code under a transient __main__; DataLoader workers
+    pickle batches and cannot resolve custom classes (e.g. SubgraphsData) defined there."""
+    if requested <= 0:
+        return 0
+    try:
+        from IPython import get_ipython
+        if get_ipython() is not None:
+            return 0
+    except ImportError:
+        pass
+    return requested
+
+
+def enable_h100_optimizations():
+    """Enable GPU optimizations for H100 (also benefits A100/RTX 40xx)."""
+    # TF32: ~2x faster float32 matmuls with negligible precision loss
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+    # cuDNN autotuner: finds fastest conv algorithms for fixed input sizes
+    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.deterministic = False
+    # Set float32 matmul precision to high (uses TF32 internally)
+    torch.set_float32_matmul_precision('high')
 
 
 # ── SECTION 3: Per-dataset configs (inlined from YAML) ───────────
@@ -2490,10 +2524,11 @@ def _ema_update(model, momentum_weight):
 # Used by: ZINC, DD, IMDB-BINARY, IMDB-MULTI, REDDIT-BINARY, REDDIT-MULTI-5K
 
 def train_beta05(train_loader, model, optimizer, evaluator=None, device='cpu',
-                 momentum_weight=0.996, sharp=None, criterion_type=0):
+                 momentum_weight=0.996, sharp=None, criterion_type=0, scaler=None):
     criterion = torch.nn.SmoothL1Loss(beta=0.5)
     step_losses, num_targets = [], []
-    for data in train_loader:
+    use_amp = scaler is not None
+    for data in tqdm(train_loader, desc='Train', leave=False):
         if model.use_lap:
             batch_pos_enc = data.lap_pos_enc
             sign_flip = torch.rand(batch_pos_enc.size(1))
@@ -2503,12 +2538,18 @@ def train_beta05(train_loader, model, optimizer, evaluator=None, device='cpu',
         data = data.to(device)
         optimizer.zero_grad()
 
-        loss, num_t = _compute_loss(model, data, criterion, criterion_type)
+        with torch.amp.autocast('cuda', enabled=use_amp):
+            loss, num_t = _compute_loss(model, data, criterion, criterion_type)
         step_losses.append(loss.item())
         num_targets.append(num_t)
 
-        loss.backward()
-        optimizer.step()
+        if use_amp:
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            loss.backward()
+            optimizer.step()
 
         with torch.no_grad():
             _ema_update(model, momentum_weight)
@@ -2518,12 +2559,14 @@ def train_beta05(train_loader, model, optimizer, evaluator=None, device='cpu',
 
 
 @torch.no_grad()
-def test_beta05(loader, model, evaluator=None, device='cpu', criterion_type=0):
+def test_beta05(loader, model, evaluator=None, device='cpu', criterion_type=0, scaler=None):
     criterion = torch.nn.SmoothL1Loss(beta=0.5)
+    use_amp = scaler is not None
     step_losses, num_targets = [], []
-    for data in loader:
+    for data in tqdm(loader, desc='Eval', leave=False):
         data = data.to(device)
-        loss, num_t = _compute_loss(model, data, criterion, criterion_type)
+        with torch.amp.autocast('cuda', enabled=use_amp):
+            loss, num_t = _compute_loss(model, data, criterion, criterion_type)
         step_losses.append(loss.item())
         num_targets.append(num_t)
 
@@ -2535,10 +2578,11 @@ def test_beta05(loader, model, evaluator=None, device='cpu', criterion_type=0):
 # Used by: MUTAG, PROTEINS
 
 def train_beta10(train_loader, model, optimizer, evaluator=None, device='cpu',
-                 momentum_weight=0.996, sharp=None, criterion_type=0):
+                 momentum_weight=0.996, sharp=None, criterion_type=0, scaler=None):
     criterion = torch.nn.SmoothL1Loss()
     step_losses, num_targets = [], []
-    for data in train_loader:
+    use_amp = scaler is not None
+    for data in tqdm(train_loader, desc='Train', leave=False):
         if model.use_lap:
             batch_pos_enc = data.lap_pos_enc
             sign_flip = torch.rand(batch_pos_enc.size(1))
@@ -2548,12 +2592,18 @@ def train_beta10(train_loader, model, optimizer, evaluator=None, device='cpu',
         data = data.to(device)
         optimizer.zero_grad()
 
-        loss, num_t = _compute_loss(model, data, criterion, criterion_type)
+        with torch.amp.autocast('cuda', enabled=use_amp):
+            loss, num_t = _compute_loss(model, data, criterion, criterion_type)
         step_losses.append(loss.item())
         num_targets.append(num_t)
 
-        loss.backward()
-        optimizer.step()
+        if use_amp:
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            loss.backward()
+            optimizer.step()
 
         with torch.no_grad():
             _ema_update(model, momentum_weight)
@@ -2563,12 +2613,14 @@ def train_beta10(train_loader, model, optimizer, evaluator=None, device='cpu',
 
 
 @torch.no_grad()
-def test_beta10(loader, model, evaluator=None, device='cpu', criterion_type=0):
+def test_beta10(loader, model, evaluator=None, device='cpu', criterion_type=0, scaler=None):
     criterion = torch.nn.SmoothL1Loss()
+    use_amp = scaler is not None
     step_losses, num_targets = [], []
-    for data in loader:
+    for data in tqdm(loader, desc='Eval', leave=False):
         data = data.to(device)
-        loss, num_t = _compute_loss(model, data, criterion, criterion_type)
+        with torch.amp.autocast('cuda', enabled=use_amp):
+            loss, num_t = _compute_loss(model, data, criterion, criterion_type)
         step_losses.append(loss.item())
         num_targets.append(num_t)
 
@@ -2583,10 +2635,11 @@ def test_beta10(loader, model, evaluator=None, device='cpu', criterion_type=0):
 # EMA done inline.
 
 def train_exp(train_loader, model, optimizer, evaluator=None, device='cpu',
-              momentum_weight=0.996, sharp=None, criterion_type=0):
+              momentum_weight=0.996, sharp=None, criterion_type=0, scaler=None):
     criterion = torch.nn.SmoothL1Loss()
     step_losses, num_targets = [], []
-    for data in train_loader:
+    use_amp = scaler is not None
+    for data in tqdm(train_loader, desc='Train', leave=False):
         if model.use_lap:
             batch_pos_enc = data.lap_pos_enc
             sign_flip = torch.rand(batch_pos_enc.size(1))
@@ -2595,14 +2648,21 @@ def train_exp(train_loader, model, optimizer, evaluator=None, device='cpu',
             data.lap_pos_enc = batch_pos_enc * sign_flip.unsqueeze(0)
         data = data.to(device)
         optimizer.zero_grad()
-        target_x, target_y = model(data)
-        loss = criterion(target_x, target_y)
+
+        with torch.amp.autocast('cuda', enabled=use_amp):
+            target_x, target_y = model(data)
+            loss = criterion(target_x, target_y)
 
         step_losses.append(loss.item())
         num_targets.append(len(target_y))
 
-        loss.backward()
-        optimizer.step()
+        if use_amp:
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            loss.backward()
+            optimizer.step()
 
         with torch.no_grad():
             for param_q, param_k in zip(model.context_encoder.parameters(), model.target_encoder.parameters()):
@@ -2613,13 +2673,15 @@ def train_exp(train_loader, model, optimizer, evaluator=None, device='cpu',
 
 
 @torch.no_grad()
-def test_exp(loader, model, evaluator=None, device='cpu', criterion_type=0):
+def test_exp(loader, model, evaluator=None, device='cpu', criterion_type=0, scaler=None):
     criterion = torch.nn.SmoothL1Loss()
+    use_amp = scaler is not None
     step_losses, num_targets = [], []
-    for data in loader:
+    for data in tqdm(loader, desc='Eval', leave=False):
         data = data.to(device)
-        target_x, target_y = model(data)
-        loss = criterion(target_y, target_x)  # reversed args — copied from train/exp.py
+        with torch.amp.autocast('cuda', enabled=use_amp):
+            target_x, target_y = model(data)
+            loss = criterion(target_y, target_x)  # reversed args — copied from train/exp.py
 
         step_losses.append(loss.item())
         num_targets.append(len(target_y))
@@ -2655,12 +2717,19 @@ def run(cfg, create_dataset_fn, create_model_fn, train_fn, test_fn, evaluator=No
 
     train_dataset, val_dataset, test_dataset = create_dataset_fn(cfg)
 
+    _use_cuda = 'cuda' in cfg.device
+    _nw = dataloader_num_workers(cfg.num_workers)
+    _dl_kwargs = dict(num_workers=_nw,
+                      pin_memory=_use_cuda,
+                      persistent_workers=_nw > 0)
     train_loader = DataLoader(
-        train_dataset, cfg.train.batch_size, shuffle=True, num_workers=cfg.num_workers)
+        train_dataset, cfg.train.batch_size, shuffle=True, **_dl_kwargs)
     val_loader = DataLoader(
-        val_dataset, cfg.train.batch_size, shuffle=False, num_workers=cfg.num_workers)
+        val_dataset, cfg.train.batch_size, shuffle=False, **_dl_kwargs)
     test_loader = DataLoader(
-        test_dataset, cfg.train.batch_size, shuffle=False, num_workers=cfg.num_workers)
+        test_dataset, cfg.train.batch_size, shuffle=False, **_dl_kwargs)
+
+    scaler = torch.amp.GradScaler('cuda') if _use_cuda else None
 
     train_losses = []
     per_epoch_times = []
@@ -2669,6 +2738,8 @@ def run(cfg, create_dataset_fn, create_model_fn, train_fn, test_fn, evaluator=No
     for run_idx in range(cfg.train.runs):
         set_seed(seeds[run_idx])
         model = create_model_fn(cfg).to(cfg.device)
+        if _use_cuda:
+            model = torch.compile(model)
         print(f"\nNumber of parameters: {count_parameters(model)}")
 
         sharp = False
@@ -2685,24 +2756,25 @@ def run(cfg, create_dataset_fn, create_model_fn, train_fn, test_fn, evaluator=No
         ema_params = [0.996, 1.0]
         momentum_scheduler = (ema_params[0] + i * (ema_params[1] - ema_params[0]) / (ipe * cfg.train.epochs)
                               for i in range(int(ipe * cfg.train.epochs) + 1))
-        for epoch in range(cfg.train.epochs):
+        epoch_pbar = tqdm(range(cfg.train.epochs), desc=f'Run {run_idx}')
+        for epoch in epoch_pbar:
             start = time.time()
             model.train()
             _, train_loss = train_fn(
                 train_loader, model, optimizer,
                 evaluator=evaluator, device=cfg.device, momentum_weight=next(momentum_scheduler),
-                sharp=sharp, criterion_type=cfg.jepa.dist)
+                sharp=sharp, criterion_type=cfg.jepa.dist, scaler=scaler)
             model.eval()
             _, val_loss = test_fn(val_loader, model,
-                                  evaluator=evaluator, device=cfg.device, criterion_type=cfg.jepa.dist)
+                                  evaluator=evaluator, device=cfg.device, criterion_type=cfg.jepa.dist, scaler=scaler)
             _, test_loss = test_fn(test_loader, model,
-                                   evaluator=evaluator, device=cfg.device, criterion_type=cfg.jepa.dist)
+                                   evaluator=evaluator, device=cfg.device, criterion_type=cfg.jepa.dist, scaler=scaler)
 
             time_cur_epoch = time.time() - start
             per_epoch_time.append(time_cur_epoch)
 
-            print(f'Epoch: {epoch:03d}, Train Loss: {train_loss:.4f}, Val: {val_loss:.4f}, '
-                  f'Test: {test_loss:.4f} Seconds: {time_cur_epoch:.4f}')
+            epoch_pbar.set_postfix(train=f'{train_loss:.4f}', val=f'{val_loss:.4f}',
+                                   test=f'{test_loss:.4f}', sec=f'{time_cur_epoch:.1f}')
 
             if scheduler is not None:
                 scheduler.step(val_loss)
@@ -2786,6 +2858,13 @@ def run_k_fold(cfg, create_dataset_fn, create_model_fn, train_fn, test_fn, evalu
     else:
         k_fold_indices = k_fold(dataset, cfg.k)
 
+    _use_cuda = 'cuda' in cfg.device
+    _nw = dataloader_num_workers(cfg.num_workers)
+    _dl_kwargs = dict(num_workers=_nw,
+                      pin_memory=_use_cuda,
+                      persistent_workers=_nw > 0)
+    scaler = torch.amp.GradScaler('cuda') if _use_cuda else None
+
     train_losses = []
     per_epoch_times = []
     total_times = []
@@ -2804,11 +2883,13 @@ def run_k_fold(cfg, create_dataset_fn, create_model_fn, train_fn, test_fn, evalu
                 train_dataset = [x for x in train_dataset]
 
             train_loader = DataLoader(
-                train_dataset, cfg.train.batch_size, shuffle=True, num_workers=cfg.num_workers)
+                train_dataset, cfg.train.batch_size, shuffle=True, **_dl_kwargs)
             test_loader = DataLoader(
-                test_dataset, cfg.train.batch_size, shuffle=False, num_workers=cfg.num_workers)
+                test_dataset, cfg.train.batch_size, shuffle=False, **_dl_kwargs)
 
             model = create_model_fn(cfg).to(cfg.device)
+            if _use_cuda:
+                model = torch.compile(model)
 
             optimizer = torch.optim.Adam(
                 model.parameters(), lr=cfg.train.lr, weight_decay=cfg.train.wd)
@@ -2824,24 +2905,26 @@ def run_k_fold(cfg, create_dataset_fn, create_model_fn, train_fn, test_fn, evalu
             momentum_scheduler = (ema_params[0] + i * (ema_params[1] - ema_params[0]) / (ipe * cfg.train.epochs)
                                   for i in range(int(ipe * cfg.train.epochs) + 1))
 
-            for epoch in range(cfg.train.epochs):
+            epoch_pbar = tqdm(range(cfg.train.epochs), desc=f'Fold {fold}')
+            for epoch in epoch_pbar:
                 start = time.time()
                 model.train()
                 _, train_loss = train_fn(
                     train_loader, model, optimizer,
                     evaluator=evaluator, device=cfg.device,
-                    momentum_weight=next(momentum_scheduler), criterion_type=cfg.jepa.dist)
+                    momentum_weight=next(momentum_scheduler), criterion_type=cfg.jepa.dist,
+                    scaler=scaler)
                 model.eval()
                 _, test_loss = test_fn(
                     test_loader, model, evaluator=evaluator, device=cfg.device,
-                    criterion_type=cfg.jepa.dist)
+                    criterion_type=cfg.jepa.dist, scaler=scaler)
 
                 scheduler.step(test_loss)
                 time_cur_epoch = time.time() - start
                 per_epoch_time.append(time_cur_epoch)
 
-                print(f'Epoch/Fold: {epoch:03d}/{fold}, Train Loss: {train_loss:.4f}'
-                      f' Test Loss:{test_loss:.4f}, Seconds: {time_cur_epoch:.4f}, ')
+                epoch_pbar.set_postfix(train=f'{train_loss:.4f}', test=f'{test_loss:.4f}',
+                                       sec=f'{time_cur_epoch:.1f}')
 
                 if optimizer.param_groups[0]['lr'] < cfg.train.min_lr:
                     print("!! LR EQUAL TO MIN LR SET.")
@@ -2877,9 +2960,9 @@ def run_k_fold(cfg, create_dataset_fn, create_model_fn, train_fn, test_fn, evalu
             print("Data shapes:", X_train.shape, y_train.shape, X_test.shape, y_test.shape)
 
             from sklearn.preprocessing import StandardScaler
-            scaler = StandardScaler()
-            X_train = scaler.fit_transform(X_train)
-            X_test = scaler.transform(X_test)
+            x_scaler = StandardScaler()
+            X_train = x_scaler.fit_transform(X_train)
+            X_test = x_scaler.transform(X_test)
 
             lin_model = LogisticRegression(max_iter=50000)
             lin_model.fit(X_train, y_train)
@@ -2947,6 +3030,8 @@ def main():
     cfg = build_cfg(DATASET)
     cfg.dataset = internal_name
     cfg.device = f'cuda:{DEVICE}' if torch.cuda.is_available() and DEVICE != 'cpu' else 'cpu'
+    if 'cuda' in cfg.device:
+        enable_h100_optimizations()
     if SEED is not None:
         cfg.seed = SEED
     if RUNS is not None:
